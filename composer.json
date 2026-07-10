@@ -1,0 +1,42 @@
+{
+	"name": "satisfactory-tools/api",
+	"description": "API for Satisfactory Tools",
+	"type": "project",
+	"license": ["MIT"],
+	"authors": [
+		{
+			"name": "greeny",
+			"homepage": "https://github.com/greeny/"
+		}
+	],
+	"require": {
+		"php": ">= 8.5",
+		"contributte/apitte": "^0.14.0",
+		"contributte/console": "~v0.11.0",
+		"contributte/middlewares": "^0.13.1",
+		"contributte/psr6-caching": "^0.4.0",
+		"firebase/php-jwt": "^7.1",
+		"nette/application": "~v3.2.9",
+		"nette/bootstrap": "~v3.2.7",
+		"nette/caching": "~v3.4.1",
+		"nette/di": "~v3.2.5",
+		"nette/http": "~v3.3.3",
+		"nette/robot-loader": "~v4.1.2",
+		"nette/security": "~v3.2.2",
+		"nette/utils": "~v4.1.3",
+		"nettrine/dbal": "~v0.10.3",
+		"nettrine/orm": "~v0.10.1",
+		"ramsey/uuid": "^4.9",
+		"ramsey/uuid-doctrine": "^2.1",
+		"tracy/tracy": "~v2.11.3"
+	},
+	"autoload": {
+		"psr-4": {
+			"greeny\\SatisfactoryTools\\Api\\": "app"
+		}
+	},
+	"config": {
+		"sort-packages": true,
+		"optimize-autoloader": true
+	}
+}

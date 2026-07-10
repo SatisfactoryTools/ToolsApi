@@ -1,0 +1,12 @@
+#!/usr/bin/env php
+<?php
+
+use Contributte\Console\Application;
+use greeny\SatisfactoryTools\Api\Bootstrap;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+$bootstrap = new Bootstrap;
+$bootstrap->bootWebApplication()
+	->getByType(Application::class)
+	->run();

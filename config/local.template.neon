@@ -1,0 +1,25 @@
+parameters:
+	jwtSecret: 'change-this-to-a-long-random-secret-at-least-32-chars'
+
+	# Absolute paths to the world-data-generator binary and its default-world.json
+	# (see world-data.md). The world file is intentionally not committed.
+	worldDataGeneratorBin: '/path/to/world-data-generator/target/release/world-data-generator'
+	worldDataWorldFile: '/path/to/world-data-generator/default-world.json'
+
+	# Frontend page that receives the provider redirect. The per-provider callback is
+	# this value + "/{provider}", e.g. https://tools.example.com/auth/callback/discord
+	oauthCallbackBaseUrl: 'https://tools.example.com/auth/callback'
+
+	# See docs/oauth-provider-setup.md for how to obtain each of these.
+	oauthDiscordClientId: ''
+	oauthDiscordClientSecret: ''
+	oauthGithubClientId: ''
+	oauthGithubClientSecret: ''
+	oauthGoogleClientId: ''
+	oauthGoogleClientSecret: ''
+
+nettrine.dbal:
+	connections:
+		default:
+			user: root
+			password:

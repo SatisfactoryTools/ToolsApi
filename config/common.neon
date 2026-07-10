@@ -1,0 +1,91 @@
+parameters:
+	jwt:
+		secret: %jwtSecret%
+		accessTokenTtl: 3600      # 1 hour
+		refreshTokenTtl: 2592000  # 30 days
+	worldData:
+		# External world-data-generator CLI (see world-data.md) and its default-world.json.
+		generatorBin: %worldDataGeneratorBin%
+		worldFile: %worldDataWorldFile%
+		timeout: 60               # seconds before a generation run is aborted
+
+	oauth:
+		# Base URL of the frontend callback page. The per-provider redirect URI is this
+		# plus "/{provider}", e.g. https://tools.example.com/auth/callback/discord
+		callbackBaseUrl: %oauthCallbackBaseUrl%
+		stateTtl: 600             # 10 minutes for an in-flight authorization
+		discord:
+			clientId: %oauthDiscordClientId%
+			clientSecret: %oauthDiscordClientSecret%
+		github:
+			clientId: %oauthGithubClientId%
+			clientSecret: %oauthGithubClientSecret%
+		google:
+			clientId: %oauthGoogleClientId%
+			clientSecret: %oauthGoogleClientSecret%
+		# Steam needs no client credentials — OpenID 2.0 only returns a Steam ID.
+
+php:
+	date.timezone: Europe/Prague
+
+api:
+	debug: %debugMode%
+	catchException: true
+	plugins:
+		Apitte\Middlewares\DI\MiddlewaresPlugin:
+		Apitte\Console\DI\ConsolePlugin:
+		Apitte\Core\DI\Plugin\CoreMappingPlugin:
+			types:
+				uuid: greeny\SatisfactoryTools\Api\Utils\UuidTypeMapper
+
+decorator:
+	Doctrine\ORM\Configuration:
+		setup:
+			- setTypedFieldMapper
+
+di:
+	export:
+		parameters: no
+		tags: no
+
+extensions:
+	api: Apitte\Core\DI\ApiExtension
+	console: Contributte\Console\DI\ConsoleExtension(%consoleMode%)
+	middleware: Contributte\Middlewares\DI\MiddlewaresExtension
+	nettrine.dbal: Nettrine\DBAL\DI\DbalExtension
+	nettrine.orm: Nettrine\ORM\DI\OrmExtension
+	psr6: Contributte\Psr6\DI\Psr6CachingExtension
+
+middleware:
+	debug: %debugMode%
+
+nettrine.dbal:
+	debug:
+		panel: %debugMode%
+	types:
+		uuid: Ramsey\Uuid\Doctrine\UuidType
+	connections:
+		default:
+			driver: mysqli
+			user: root
+			password:
+			dbname: sftools
+
+nettrine.orm:
+	managers:
+		default:
+			connection: default
+			defaultCache: Contributte\Psr6\CachePool(
+				Nette\Caching\Cache(
+					Nette\Caching\Storages\FileStorage(%tempDir%/cache)
+					doctrine/orm
+				)
+			)
+			lazyNativeObjects: true
+			mapping:
+				Api:
+					directories: [%appDir%/Model/Entities]
+					namespace: greeny\SatisfactoryTools\Api
+
+session:
+	expiration: 30 days

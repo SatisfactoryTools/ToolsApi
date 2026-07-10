@@ -1,0 +1,85 @@
+search:
+	controllers:
+		in: %appDir%/Modules
+		classes:
+			- *Controller
+	model:
+		in: %appDir%/Model
+		classes:
+			- *Repository
+			- *Facade
+
+services:
+	- greeny\SatisfactoryTools\Api\Model\NullableTypedFieldMapper
+
+	- Tracy\Bridges\Psr\TracyToPsrLoggerAdapter
+
+	- greeny\SatisfactoryTools\Api\Model\Services\CustomVersionDataGenerator(%appDir%/../www)
+
+	- greeny\SatisfactoryTools\Api\Model\Services\ModDataStorage(%appDir%/../www)
+
+	- greeny\SatisfactoryTools\Api\Model\Services\ShareService
+
+	worldDataService:
+		factory: greeny\SatisfactoryTools\Api\Model\Services\WorldDataService(
+			generatorBin: %worldData.generatorBin%,
+			worldFile: %worldData.worldFile%,
+			timeout: %worldData.timeout%
+		)
+
+	- greeny\SatisfactoryTools\Api\Console\PublishCommand(wwwDir: %appDir%/../www)
+
+	authService:
+		factory: greeny\SatisfactoryTools\Api\Model\Services\AuthService(
+			jwtSecret: %jwt.secret%,
+			accessTokenTtl: %jwt.accessTokenTtl%,
+			refreshTokenTtl: %jwt.refreshTokenTtl%
+		)
+
+	oauthDiscordProvider:
+		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\DiscordProvider(
+			clientId: %oauth.discord.clientId%,
+			clientSecret: %oauth.discord.clientSecret%
+		)
+
+	oauthGithubProvider:
+		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\GithubProvider(
+			clientId: %oauth.github.clientId%,
+			clientSecret: %oauth.github.clientSecret%
+		)
+
+	oauthGoogleProvider:
+		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\GoogleProvider(
+			clientId: %oauth.google.clientId%,
+			clientSecret: %oauth.google.clientSecret%
+		)
+
+	oauthSteamProvider:
+		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\SteamProvider
+
+	oauthProviderRegistry:
+		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\OAuthProviderRegistry([
+			@oauthDiscordProvider,
+			@oauthGithubProvider,
+			@oauthGoogleProvider,
+			@oauthSteamProvider
+		])
+
+	oauthService:
+		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\OAuthService(
+			registry: @oauthProviderRegistry,
+			callbackBaseUrl: %oauth.callbackBaseUrl%,
+			stateTtl: %oauth.stateTtl%
+		)
+
+	corsMiddleware:
+		factory: greeny\SatisfactoryTools\Api\Utils\CorsMiddleware
+		tags:
+			middleware:
+				priority: 10
+
+	jwtMiddleware:
+		factory: greeny\SatisfactoryTools\Api\Utils\JwtMiddleware
+		tags:
+			middleware:
+				priority: 20
