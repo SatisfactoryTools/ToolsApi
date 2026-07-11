@@ -16,3 +16,4 @@ config/local.neon
 # generated / runtime data
 www/data/*
 !www/data/.gitkeep
+!www/data/.htaccess
