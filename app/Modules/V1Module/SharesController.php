@@ -67,7 +67,7 @@ class SharesController extends BaseV1Controller
 				->writeJsonBody(['error' => 'Fields version and id must be valid UUIDs']);
 		}
 
-		$version = $this->versionRepository->getByUuidVisibleToUser($versionId, $user);
+		$version = $this->versionRepository->getByUuid($versionId);
 		if ($version === null) {
 			return $response->withStatus(IResponse::S404_NotFound)
 				->writeJsonBody(['error' => 'Version not found']);

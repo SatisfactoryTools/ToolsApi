@@ -1,0 +1,6 @@
+# Generated custom version data files are content-addressed (uuid + inputs hash in the
+# filename), so a URL always serves the same bytes and may be cached indefinitely. When
+# a version's inputs change it gets a new URL via the API.
+<IfModule mod_headers.c>
+	Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>

@@ -185,7 +185,12 @@ class CustomVersionDataGenerator
 			throw new RuntimeException('Could not encode generated version data', 0, $e);
 		}
 
-		if (@file_put_contents($absolute, $json) === false) {
+		// Write-then-rename so a crash mid-write can never leave a truncated file at the
+		// final path — readers (Apache serves these statically) see the old file or the
+		// complete new one, never a partial write.
+		$tmp = $absolute . '.tmp';
+		if (@file_put_contents($tmp, $json) === false || !@rename($tmp, $absolute)) {
+			@unlink($tmp);
 			throw new RuntimeException(sprintf('Could not write version data file: %s', $relativePath));
 		}
 	}

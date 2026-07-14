@@ -16,6 +16,18 @@ class ModVersionRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['uuid' => $uuid, 'mod' => $mod]);
 	}
 
+	/** A mod version by UUID, only if its mod is public (the anonymous-visibility rule). */
+	public function getByUuidPublic(string $uuid): ?ModVersion
+	{
+		return $this->getRepository()->createQueryBuilder('mv')
+			->join('mv.mod', 'm')
+			->where('mv.uuid = :uuid')
+			->andWhere('m.public = true')
+			->setParameter('uuid', $uuid, 'uuid')
+			->getQuery()
+			->getOneOrNullResult();
+	}
+
 	/**
 	 * A mod version by UUID, only if its mod is visible to the user (public, or owned by
 	 * the user).

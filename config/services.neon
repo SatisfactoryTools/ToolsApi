@@ -16,6 +16,11 @@ services:
 
 	- greeny\SatisfactoryTools\Api\Model\Services\CustomVersionDataGenerator(%appDir%/../www)
 
+	- greeny\SatisfactoryTools\Api\Model\Services\CustomVersionFileService(
+		wwwDir: %appDir%/../www,
+		lockDir: %tempDir%/locks
+	)
+
 	- greeny\SatisfactoryTools\Api\Model\Services\ModDataStorage(%appDir%/../www)
 
 	- greeny\SatisfactoryTools\Api\Model\Services\ShareService
@@ -24,10 +29,13 @@ services:
 		factory: greeny\SatisfactoryTools\Api\Model\Services\WorldDataService(
 			generatorBin: %worldData.generatorBin%,
 			worldFile: %worldData.worldFile%,
-			timeout: %worldData.timeout%
+			timeout: %worldData.timeout%,
+			cacheDir: %tempDir%/cache/world-data
 		)
 
 	- greeny\SatisfactoryTools\Api\Console\PublishCommand(wwwDir: %appDir%/../www)
+
+	- greeny\SatisfactoryTools\Api\Console\PruneVersionFilesCommand(wwwDir: %appDir%/../www)
 
 	authService:
 		factory: greeny\SatisfactoryTools\Api\Model\Services\AuthService(

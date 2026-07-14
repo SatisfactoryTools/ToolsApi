@@ -144,7 +144,6 @@ class PublishCommand extends Command
 		$version->custom = false;
 		$version->ficsmas = $ficsmas;
 		$version->dataPath = $dataPath;
-		$version->user = null;
 		$version->baseVersion = null;
 		$version->recipeCostMultiplier = 1.0;
 		$version->powerCostMultiplier = 1.0;

@@ -28,6 +28,12 @@ abstract class BaseRepository
 		}
 	}
 
+	/** Flushes changes accumulated by save(..., flush: false) calls. */
+	public function flush(): void
+	{
+		$this->entityManager->flush();
+	}
+
 	/** @param T $entity */
 	public function delete(object $entity, bool $flush = true): void
 	{

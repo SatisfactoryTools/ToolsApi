@@ -2,15 +2,18 @@
 
 namespace greeny\SatisfactoryTools\Api\Schema\Responses;
 
-use greeny\SatisfactoryTools\Api\Model\Entities\ModVersion;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
+use greeny\SatisfactoryTools\Api\Model\Entities\VersionModVersion;
 use Ramsey\Uuid\UuidInterface;
 
 /** @extends ArrayableResponse<Version> */
 class VersionResponse extends ArrayableResponse
 {
 
-	/** @param string[] $mods */
+	/**
+	 * @param string[] $mods mod version UUIDs in application order
+	 * @param array<string, mixed>|null $worldData
+	 */
 	public function __construct(
 		public UuidInterface $id,
 		public readonly string $name,
@@ -24,6 +27,7 @@ class VersionResponse extends ArrayableResponse
 		public readonly float $recipeCost,
 		public readonly float $powerCost,
 		public readonly array $mods,
+		public readonly ?array $worldData,
 	)
 	{
 	}
@@ -43,9 +47,10 @@ class VersionResponse extends ArrayableResponse
 			recipeCost: $entity->recipeCostMultiplier,
 			powerCost: $entity->powerCostMultiplier,
 			mods: array_map(
-				static fn (ModVersion $modVersion): string => $modVersion->uuid->toString(),
+				static fn (VersionModVersion $link): string => $link->modVersion->uuid->toString(),
 				$entity->modVersions->toArray(),
 			),
+			worldData: $entity->worldData,
 		);
 	}
 

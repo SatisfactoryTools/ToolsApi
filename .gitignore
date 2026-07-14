@@ -17,3 +17,8 @@ config/local.neon
 www/data/*
 !www/data/.gitkeep
 !www/data/.htaccess
+!www/data/versions/
+www/data/versions/*
+!www/data/versions/custom/
+www/data/versions/custom/*
+!www/data/versions/custom/.htaccess

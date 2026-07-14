@@ -28,6 +28,7 @@ class WorldDataService
 		private readonly string $generatorBin,
 		private readonly string $worldFile,
 		private readonly int $timeout = 60,
+		private readonly string $cacheDir = '',
 	)
 	{
 	}
@@ -56,6 +57,37 @@ class WorldDataService
 			throw new WorldDataException('World data file not found');
 		}
 
+		// The generator is deterministic for a given (seed, mode, purity), so results are
+		// cached on disk. The endpoint is open to anonymous users; the per-key lock also
+		// prevents a thundering herd from running the (expensive) binary in parallel.
+		if ($this->cacheDir === '') {
+			return $this->generateUncached($seed, $mode, $purity);
+		}
+
+		$cacheFile = sprintf('%s/%s_%s_%d.json', rtrim($this->cacheDir, '/'), $mode, $purity, $seed);
+
+		$cached = $this->readCache($cacheFile);
+		if ($cached !== null) {
+			return $cached;
+		}
+
+		return $this->withLock($cacheFile . '.lock', function () use ($seed, $mode, $purity, $cacheFile): array {
+			// Another request may have produced the result while we waited for the lock.
+			$cached = $this->readCache($cacheFile);
+			if ($cached !== null) {
+				return $cached;
+			}
+
+			$result = $this->generateUncached($seed, $mode, $purity);
+			$this->writeCache($cacheFile, $result);
+
+			return $result;
+		});
+	}
+
+	/** @return array<string, mixed> */
+	private function generateUncached(int $seed, string $mode, string $purity): array
+	{
 		$raw = $this->run([
 			$this->generatorBin,
 			'--seed=' . $seed,
@@ -65,6 +97,62 @@ class WorldDataService
 		]);
 
 		return $this->aggregate($raw, $seed, $mode, $purity);
+	}
+
+	/** @return array<string, mixed>|null */
+	private function readCache(string $cacheFile): ?array
+	{
+		$contents = @file_get_contents($cacheFile);
+		if ($contents === false) {
+			return null;
+		}
+
+		try {
+			$decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+		} catch (JsonException) {
+			return null;
+		}
+
+		return is_array($decoded) ? $decoded : null;
+	}
+
+	/** @param array<string, mixed> $result */
+	private function writeCache(string $cacheFile, array $result): void
+	{
+		$dir = dirname($cacheFile);
+		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) {
+			return; // caching is best-effort — the result is still returned
+		}
+
+		$tmp = $cacheFile . '.tmp';
+		if (@file_put_contents($tmp, json_encode($result)) === false || !@rename($tmp, $cacheFile)) {
+			@unlink($tmp);
+		}
+	}
+
+	/**
+	 * @template T
+	 * @param callable(): T $callback
+	 * @return T
+	 */
+	private function withLock(string $lockFile, callable $callback): mixed
+	{
+		$dir = dirname($lockFile);
+		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) {
+			return $callback(); // no lock dir — run unguarded rather than fail
+		}
+
+		$handle = @fopen($lockFile, 'c');
+		if ($handle === false || !flock($handle, LOCK_EX)) {
+			return $callback();
+		}
+
+		try {
+			return $callback();
+		} finally {
+			flock($handle, LOCK_UN);
+			fclose($handle);
+		}
 	}
 
 	/**

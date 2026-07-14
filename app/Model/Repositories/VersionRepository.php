@@ -22,7 +22,8 @@ class VersionRepository extends BaseRepository
 	}
 
 	/**
-	 * Public (built-in) versions plus the user's own custom versions.
+	 * Public (built-in) versions plus the custom versions the user has saved (linked)
+	 * to their account.
 	 *
 	 * @return Version[]
 	 */
@@ -30,7 +31,7 @@ class VersionRepository extends BaseRepository
 	{
 		return $this->getRepository()->createQueryBuilder('v')
 			->where('v.custom = false')
-			->orWhere('v.user = :user')
+			->orWhere(':user MEMBER OF v.users')
 			->setParameter('user', $user)
 			->getQuery()
 			->getResult();
@@ -47,19 +48,10 @@ class VersionRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['dataPath' => $dataPath]);
 	}
 
-	/**
-	 * A version by UUID, but only if it is visible to the user: a public version, or one
-	 * the user owns. Returns null for another user's custom version.
-	 */
-	public function getByUuidVisibleToUser(string $uuid, User $user): ?Version
+	/** An existing custom version with the exact same definition (dedup on create). */
+	public function getByDefinitionHash(string $definitionHash): ?Version
 	{
-		return $this->getRepository()->createQueryBuilder('v')
-			->where('v.uuid = :uuid')
-			->andWhere('v.custom = false OR v.user = :user')
-			->setParameter('uuid', $uuid, 'uuid')
-			->setParameter('user', $user)
-			->getQuery()
-			->getOneOrNullResult();
+		return $this->getRepository()->findOneBy(['definitionHash' => $definitionHash]);
 	}
 
 	protected function getEntityClass(): string

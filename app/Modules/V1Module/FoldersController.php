@@ -41,7 +41,7 @@ class FoldersController extends BaseV1Controller
 				->writeJsonBody(['error' => 'Unauthorized']);
 		}
 
-		$version = $this->getVersion($request, $user);
+		$version = $this->getVersion($request);
 		if ($version === null) {
 			return $response->withStatus(IResponse::S404_NotFound)
 				->writeJsonBody(['error' => 'Version not found']);
@@ -110,7 +110,7 @@ class FoldersController extends BaseV1Controller
 				->writeJsonBody(['error' => 'Unauthorized']);
 		}
 
-		$version = $this->getVersion($request, $user);
+		$version = $this->getVersion($request);
 		if ($version === null) {
 			return $response->withStatus(IResponse::S404_NotFound)
 				->writeJsonBody(['error' => 'Version not found']);
@@ -172,7 +172,7 @@ class FoldersController extends BaseV1Controller
 				->writeJsonBody(['error' => 'Unauthorized']);
 		}
 
-		$version = $this->getVersion($request, $user);
+		$version = $this->getVersion($request);
 		if ($version === null) {
 			return $response->withStatus(IResponse::S404_NotFound)
 				->writeJsonBody(['error' => 'Version not found']);
@@ -230,7 +230,7 @@ class FoldersController extends BaseV1Controller
 				->writeJsonBody(['error' => 'Unauthorized']);
 		}
 
-		$version = $this->getVersion($request, $user);
+		$version = $this->getVersion($request);
 		if ($version === null) {
 			return $response->withStatus(IResponse::S404_NotFound)
 				->writeJsonBody(['error' => 'Version not found']);
@@ -248,11 +248,12 @@ class FoldersController extends BaseV1Controller
 		return $response->withStatus(IResponse::S204_NoContent);
 	}
 
-	private function getVersion(ApiRequest $request, User $user): ?Version
+	private function getVersion(ApiRequest $request): ?Version
 	{
-		return $this->versionRepository->getByUuidVisibleToUser(
+		// Any version is addressable by UUID (the UUID acts as a capability); the folders
+		// themselves are still scoped to the user.
+		return $this->versionRepository->getByUuid(
 			(string) $this->getUuidParameter($request, 'version'),
-			$user,
 		);
 	}
 
