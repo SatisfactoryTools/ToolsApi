@@ -66,6 +66,8 @@ Endpoints (v1)
 - `GET|PUT /v1/settings` - per-user settings blob
 - `POST /v1/shares` - freeze a folder/plan subtree into a read-only, point-in-time share;
   `GET /v1/shares/{uuid}` - load a share (public, no auth)
+- `GET /v1/shares/visited`, `PUT|DELETE /v1/shares/visited/{uuid}` - the user's
+  visited-shares list (capped at 20 entries; see docs/shared-plans-api.md)
 
 Importing game builds
 ----------------------

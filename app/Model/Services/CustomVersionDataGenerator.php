@@ -15,6 +15,15 @@ class CustomVersionDataGenerator
 
 	private const FLUID_FORMS = ['liquid', 'gas'];
 
+	/**
+	 * Recipes produced in any of these buildings are exempt from the recipe cost
+	 * multiplier: packaging/unpackaging must stay 1:1 or the fluid loop breaks.
+	 */
+	private const RECIPE_COST_EXEMPT_BUILDINGS = ['Desc_Packager_C'];
+
+	/** Individual recipes exempt from the recipe cost multiplier. */
+	private const RECIPE_COST_EXEMPT_RECIPES = ['Recipe_Alternate_DilutedPackagedFuel_C'];
+
 	public function __construct(
 		private readonly string $wwwDir,
 	)
@@ -95,7 +104,9 @@ class CustomVersionDataGenerator
 	/**
 	 * Increases the cost (ingredient amounts) of every recipe. Solid items use
 	 * max(1, round(abs(amount) * multiplier)); fluids (liquid/gas) are multiplied
-	 * directly, since they may carry decimal amounts.
+	 * directly, since they may carry decimal amounts. Recipes listed in
+	 * RECIPE_COST_EXEMPT_RECIPES or produced in a RECIPE_COST_EXEMPT_BUILDINGS building
+	 * (matched by class name) are left untouched.
 	 *
 	 * @param array<string, mixed> $data
 	 */
@@ -103,7 +114,11 @@ class CustomVersionDataGenerator
 	{
 		$fluidItems = $this->fluidItemLookup($data);
 
-		foreach ($data['data']['recipes'] as &$recipe) {
+		foreach ($data['data']['recipes'] as $className => &$recipe) {
+			if ($this->isRecipeCostExempt((string) $className, $recipe)) {
+				continue;
+			}
+
 			foreach ($recipe['ingredients'] as &$ingredient) {
 				$amount = $ingredient['amount'];
 				if (isset($fluidItems[$ingredient['item']])) {
@@ -115,6 +130,23 @@ class CustomVersionDataGenerator
 			unset($ingredient);
 		}
 		unset($recipe);
+	}
+
+	/**
+	 * @param array<string, mixed> $recipe
+	 */
+	private function isRecipeCostExempt(string $className, array $recipe): bool
+	{
+		if (in_array($className, self::RECIPE_COST_EXEMPT_RECIPES, true)) {
+			return true;
+		}
+
+		$producedIn = $recipe['producedIn'] ?? [];
+		if (!is_array($producedIn)) {
+			return false;
+		}
+
+		return array_intersect($producedIn, self::RECIPE_COST_EXEMPT_BUILDINGS) !== [];
 	}
 
 	/**

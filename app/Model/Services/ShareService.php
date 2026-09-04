@@ -10,6 +10,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use greeny\SatisfactoryTools\Api\Model\Repositories\FolderRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
+use greeny\SatisfactoryTools\Api\Model\Repositories\SharedVisitRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\ShareRepository;
 use JsonException;
 use Ramsey\Uuid\Uuid;
@@ -23,10 +24,18 @@ use Ramsey\Uuid\Uuid;
 class ShareService
 {
 
+	/**
+	 * Maximum entries in a user's visited-shares list; inserting beyond it evicts the
+	 * entry with the oldest visitedAt. The frontend mirrors this value for the anonymous
+	 * localStorage list, so keep the two in sync (docs/shared-plans-api.md).
+	 */
+	public const VISITED_CAP = 20;
+
 	public function __construct(
 		private readonly FolderRepository $folderRepository,
 		private readonly PlanRepository $planRepository,
 		private readonly ShareRepository $shareRepository,
+		private readonly SharedVisitRepository $sharedVisitRepository,
 	)
 	{
 	}
@@ -74,6 +83,67 @@ class ShareService
 			'version' => $snapshot['version'] ?? null,
 			'root' => $snapshot['root'] ?? null,
 		];
+	}
+
+	/**
+	 * The user's visited shares, most recently visited first, as the response payload of
+	 * GET /v1/shares/visited. Everything except visitedAt is resolved from the frozen
+	 * share at read time (shares are immutable, so the values are stable).
+	 *
+	 * @return array{shares: array<int, array<string, mixed>>}
+	 */
+	public function visitedShares(User $user): array
+	{
+		$shares = [];
+		foreach ($this->sharedVisitRepository->getByUserNewestFirst($user) as $visit) {
+			$share = $visit->share;
+			/** @var array{version: mixed, root: array<string, mixed>|null} $snapshot */
+			$snapshot = json_decode($share->snapshot, true);
+
+			$shares[] = [
+				'share' => $share->uuid->toString(),
+				'type' => $share->type,
+				'name' => $snapshot['root']['name'] ?? null,
+				'sharedAt' => $share->createdAt->format('c'),
+				'visitedAt' => $visit->visitedAt->format('c'),
+				'version' => $snapshot['version'] ?? null,
+			];
+		}
+
+		return ['shares' => $shares];
+	}
+
+	/**
+	 * Records a visit of the share by the user (upsert — an existing entry only gets its
+	 * visitedAt bumped). Returns false if no such share exists.
+	 */
+	public function recordVisit(User $user, string $shareUuid): bool
+	{
+		$share = Uuid::isValid($shareUuid) ? $this->shareRepository->getByUuid($shareUuid) : null;
+		if ($share === null) {
+			return false;
+		}
+
+		$this->sharedVisitRepository->recordVisit($user, $share, self::VISITED_CAP);
+
+		return true;
+	}
+
+	/**
+	 * Removes the user's visit entry for the share, if any. Idempotent; never touches the
+	 * share itself.
+	 */
+	public function forgetVisit(User $user, string $shareUuid): void
+	{
+		$share = Uuid::isValid($shareUuid) ? $this->shareRepository->getByUuid($shareUuid) : null;
+		if ($share === null) {
+			return;
+		}
+
+		$visit = $this->sharedVisitRepository->getByUserAndShare($user, $share);
+		if ($visit !== null) {
+			$this->sharedVisitRepository->delete($visit);
+		}
 	}
 
 	/** @param array<string, mixed> $root */

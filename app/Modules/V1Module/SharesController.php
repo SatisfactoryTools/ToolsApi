@@ -8,6 +8,7 @@ use Apitte\Core\Annotation\Controller\RequestParameter;
 use Apitte\Core\Http\ApiRequest;
 use Apitte\Core\Http\ApiResponse;
 use Apitte\Core\Schema\EndpointParameter;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Repositories\FolderRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
@@ -94,6 +95,82 @@ class SharesController extends BaseV1Controller
 			'type' => $share->type,
 			'createdAt' => $share->createdAt->format('c'),
 		]);
+	}
+
+	// The /visited endpoints must stay declared above get(): the router matches endpoints
+	// in declaration order and the /{uuid} mask would otherwise swallow GET /visited.
+
+	/**
+	 * Lists the user's visited shares, most recently visited first. Always 200; the empty
+	 * list is { "shares": [] }.
+	 */
+	#[Path('/visited')]
+	#[Method('GET')]
+	public function visitedList(ApiRequest $request, ApiResponse $response): ApiResponse
+	{
+		/** @var User|null $user */
+		$user = $request->getAttribute('user');
+		if ($user === null) {
+			return $response->withStatus(IResponse::S401_Unauthorized)
+				->writeJsonBody(['error' => 'Unauthorized']);
+		}
+
+		return $response->writeJsonBody($this->shareService->visitedShares($user));
+	}
+
+	/**
+	 * Records a visit of a share: upserts the (user, share) entry and stamps visitedAt
+	 * server-side. No request body; 204 on success (the frontend already holds the share
+	 * payload it just loaded). The list is capped at ShareService::VISITED_CAP entries —
+	 * inserting beyond the cap evicts the oldest entry.
+	 */
+	#[Path('/visited/{uuid}')]
+	#[Method('PUT')]
+	#[RequestParameter(name: 'uuid', type: 'string', in: EndpointParameter::IN_PATH)]
+	public function visitedPut(ApiRequest $request, ApiResponse $response): ApiResponse
+	{
+		/** @var User|null $user */
+		$user = $request->getAttribute('user');
+		if ($user === null) {
+			return $response->withStatus(IResponse::S401_Unauthorized)
+				->writeJsonBody(['error' => 'Unauthorized']);
+		}
+
+		try {
+			$recorded = $this->shareService->recordVisit($user, (string) $request->getParameter('uuid'));
+		} catch (UniqueConstraintViolationException) {
+			// A concurrent request inserted the same (user, share) entry first — the visit
+			// is recorded either way, which is all this endpoint promises.
+			$recorded = true;
+		}
+
+		if (!$recorded) {
+			return $response->withStatus(IResponse::S404_NotFound)
+				->writeJsonBody(['error' => 'Share not found']);
+		}
+
+		return $response->withStatus(IResponse::S204_NoContent);
+	}
+
+	/**
+	 * Removes a share from the user's visited list. Idempotent — 204 whether or not the
+	 * entry existed. Deletes only the visit entry, never the share itself.
+	 */
+	#[Path('/visited/{uuid}')]
+	#[Method('DELETE')]
+	#[RequestParameter(name: 'uuid', type: 'string', in: EndpointParameter::IN_PATH)]
+	public function visitedDelete(ApiRequest $request, ApiResponse $response): ApiResponse
+	{
+		/** @var User|null $user */
+		$user = $request->getAttribute('user');
+		if ($user === null) {
+			return $response->withStatus(IResponse::S401_Unauthorized)
+				->writeJsonBody(['error' => 'Unauthorized']);
+		}
+
+		$this->shareService->forgetVisit($user, (string) $request->getParameter('uuid'));
+
+		return $response->withStatus(IResponse::S204_NoContent);
 	}
 
 	/**

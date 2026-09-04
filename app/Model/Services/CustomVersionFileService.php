@@ -21,7 +21,7 @@ class CustomVersionFileService
 	 * Bump when CustomVersionDataGenerator's output format or merge/multiplier logic
 	 * changes, so previously generated files stop being treated as current.
 	 */
-	private const GENERATOR_VERSION = 1;
+	private const GENERATOR_VERSION = 2;
 
 	private const CUSTOM_DIR = 'data/versions/custom';
 
