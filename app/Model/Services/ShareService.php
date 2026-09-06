@@ -100,7 +100,7 @@ class ShareService
 			/** @var array{version: mixed, root: array<string, mixed>|null} $snapshot */
 			$snapshot = json_decode($share->snapshot, true);
 
-			$shares[] = [
+			$entry = [
 				'share' => $share->uuid->toString(),
 				'type' => $share->type,
 				'name' => $snapshot['root']['name'] ?? null,
@@ -108,9 +108,43 @@ class ShareService
 				'visitedAt' => $visit->visitedAt->format('c'),
 				'version' => $snapshot['version'] ?? null,
 			];
+			if ($share->type === 'plan') {
+				$entry['iconClassName'] = $this->resolvePlanIcon($snapshot['root']['data'] ?? null);
+			}
+
+			$shares[] = $entry;
 		}
 
 		return ['shares' => $shares];
+	}
+
+	/**
+	 * The icon the planner shows for a plan, read from the plan's frozen `data` JSON so
+	 * the visited list can carry it without the frontend fetching every share. Mirrors
+	 * the frontend's own rule: an explicit `iconClassName` key wins (a null there means
+	 * "no icon" and stays null), otherwise the item of the first request, otherwise null.
+	 */
+	private function resolvePlanIcon(mixed $data): ?string
+	{
+		if (!is_string($data)) {
+			return null;
+		}
+
+		$decoded = json_decode($data, true);
+		if (!is_array($decoded)) {
+			return null;
+		}
+
+		if (array_key_exists('iconClassName', $decoded)) {
+			return is_string($decoded['iconClassName']) && $decoded['iconClassName'] !== '' ? $decoded['iconClassName'] : null;
+		}
+
+		$first = $decoded['requests'][0] ?? null;
+		if (is_array($first) && is_string($first['itemClassName'] ?? null) && $first['itemClassName'] !== '') {
+			return $first['itemClassName'];
+		}
+
+		return null;
 	}
 
 	/**

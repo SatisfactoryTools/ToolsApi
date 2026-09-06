@@ -17,6 +17,7 @@ class PlanResponse extends ArrayableResponse
 		public readonly ?string $parent,
 		public readonly string $data,
 		public readonly string $createdAt,
+		public readonly string $updatedAt,
 		public readonly int $revision,
 	)
 	{
@@ -33,6 +34,7 @@ class PlanResponse extends ArrayableResponse
 			parent: $entity->parent?->uuid->toString(),
 			data: $entity->data,
 			createdAt: $entity->createdAt->format('c'),
+			updatedAt: $entity->getUpdatedAt()->format('c'),
 			revision: $entity->revision,
 		);
 	}

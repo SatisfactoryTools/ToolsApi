@@ -35,6 +35,13 @@ class Plan
 	#[ORM\Column]
 	public DateTimeImmutable $createdAt;
 
+	/**
+	 * Last content/move change. Null for plans that predate this column — treat null as
+	 * createdAt (see getUpdatedAt()).
+	 */
+	#[ORM\Column(nullable: true)]
+	public ?DateTimeImmutable $updatedAt = null;
+
 	#[ORM\Column]
 	public int $revision = 0;
 
@@ -45,5 +52,10 @@ class Plan
 	#[ORM\ManyToOne(targetEntity: Plan::class)]
 	#[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
 	public ?Plan $parent = null;
+
+	public function getUpdatedAt(): DateTimeImmutable
+	{
+		return $this->updatedAt ?? $this->createdAt;
+	}
 
 }

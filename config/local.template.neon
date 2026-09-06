@@ -17,6 +17,9 @@ parameters:
 	oauthGithubClientSecret: ''
 	oauthGoogleClientId: ''
 	oauthGoogleClientSecret: ''
+	# Optional: a Steam Web API key (https://steamcommunity.com/dev/apikey) lets the API
+	# read the Steam persona name/avatar for display. Sign-in works without it.
+	oauthSteamApiKey: ''
 
 nettrine.dbal:
 	connections:

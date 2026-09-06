@@ -17,8 +17,9 @@ interface OAuthProviderInterface
 	public function getAuthorizationUrl(string $state, string $redirectUri): string;
 
 	/**
-	 * Validate the provider's callback and return the identifying user info.
-	 * Only the account id and (where available) a verified email are read.
+	 * Validate the provider's callback and return the identifying user info: the account
+	 * id, a verified email where available, and (display only) the provider's nickname
+	 * and avatar URL where the provider hands them over during sign-in.
 	 *
 	 * @param array<string, mixed> $params      the query parameters the provider sent to the callback
 	 * @param string               $redirectUri the same redirect URI used in getAuthorizationUrl()

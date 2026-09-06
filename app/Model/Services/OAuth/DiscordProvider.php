@@ -3,7 +3,8 @@
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
 /**
- * Discord OAuth2. Scopes: `identify email`. We read the account id and verified email.
+ * Discord OAuth2. Scopes: `identify email`. We read the account id, verified email and,
+ * for display, the global name (falling back to the username) and avatar.
  * @see https://discord.com/developers/docs/topics/oauth2
  */
 class DiscordProvider extends AbstractOAuthProvider
@@ -12,6 +13,7 @@ class DiscordProvider extends AbstractOAuthProvider
 	private const AuthorizeUrl = 'https://discord.com/oauth2/authorize';
 	private const TokenUrl = 'https://discord.com/api/oauth2/token';
 	private const UserUrl = 'https://discord.com/api/users/@me';
+	private const AvatarCdn = 'https://cdn.discordapp.com/avatars/';
 
 	public function __construct(
 		private readonly string $clientId,
@@ -69,7 +71,21 @@ class DiscordProvider extends AbstractOAuthProvider
 			$email = strtolower((string) $user['email']);
 		}
 
-		return new OAuthUserInfo($id, $email);
+		// `global_name` is the display name shown in Discord; legacy accounts without one
+		// fall back to the unique username.
+		$nickname = (string) ($user['global_name'] ?? '');
+		if ($nickname === '') {
+			$nickname = (string) ($user['username'] ?? '');
+		}
+
+		$avatarHash = (string) ($user['avatar'] ?? '');
+		$avatarUrl = null;
+		if ($avatarHash !== '' && preg_match('/^[a-zA-Z0-9_]+$/', $avatarHash) === 1) {
+			// Animated avatars have an `a_` prefix and are served as GIF.
+			$avatarUrl = self::AvatarCdn . $id . '/' . $avatarHash . (str_starts_with($avatarHash, 'a_') ? '.gif' : '.png');
+		}
+
+		return new OAuthUserInfo($id, $email, $nickname !== '' ? $nickname : null, $avatarUrl);
 	}
 
 }

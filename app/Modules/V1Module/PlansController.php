@@ -135,6 +135,7 @@ class PlansController extends BaseV1Controller
 		$plan->parent = $parent;
 		$plan->data = $data;
 		$plan->createdAt = new DateTimeImmutable();
+		$plan->updatedAt = $plan->createdAt;
 
 		try {
 			$this->planRepository->save($plan);
@@ -237,6 +238,7 @@ class PlansController extends BaseV1Controller
 		}
 
 		$plan->revision++;
+		$plan->updatedAt = new DateTimeImmutable();
 		$this->planRepository->save($plan);
 
 		return $response->writeJsonBody(PlanResponse::fromEntity($plan)->toArray());
@@ -319,6 +321,7 @@ class PlansController extends BaseV1Controller
 			$plan->parent = null;
 		}
 
+		$plan->updatedAt = new DateTimeImmutable();
 		$this->planRepository->save($plan);
 
 		return $response->writeJsonBody(PlanResponse::fromEntity($plan)->toArray());

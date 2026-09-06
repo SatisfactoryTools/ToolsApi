@@ -1,4 +1,8 @@
 parameters:
+	# Optional secrets default to empty so existing local.neon files keep working; set
+	# them in local.neon to enable the feature.
+	oauthSteamApiKey: ''
+
 	jwt:
 		secret: %jwtSecret%
 		accessTokenTtl: 3600      # 1 hour
@@ -23,7 +27,11 @@ parameters:
 		google:
 			clientId: %oauthGoogleClientId%
 			clientSecret: %oauthGoogleClientSecret%
-		# Steam needs no client credentials — OpenID 2.0 only returns a Steam ID.
+		steam:
+			# Steam needs no client credentials for sign-in (OpenID 2.0 only returns a Steam
+			# ID). The Web API key is optional and only used to read the persona name and
+			# avatar for display; leave empty to skip that.
+			apiKey: %oauthSteamApiKey%
 
 php:
 	date.timezone: Europe/Prague

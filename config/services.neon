@@ -63,7 +63,9 @@ services:
 		)
 
 	oauthSteamProvider:
-		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\SteamProvider
+		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\SteamProvider(
+			apiKey: %oauth.steam.apiKey%
+		)
 
 	oauthProviderRegistry:
 		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\OAuthProviderRegistry([

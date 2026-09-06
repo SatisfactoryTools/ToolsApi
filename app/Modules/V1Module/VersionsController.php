@@ -13,6 +13,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use greeny\SatisfactoryTools\Api\Model\Entities\VersionModVersion;
 use greeny\SatisfactoryTools\Api\Model\Repositories\ModVersionRepository;
+use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
 use greeny\SatisfactoryTools\Api\Model\Services\CustomVersionFileService;
 use greeny\SatisfactoryTools\Api\Model\Services\WorldDataException;
@@ -43,6 +44,7 @@ class VersionsController extends BaseV1Controller
 	public function __construct(
 		private readonly VersionRepository $versionRepository,
 		private readonly ModVersionRepository $modVersionRepository,
+		private readonly PlanRepository $planRepository,
 		private readonly CustomVersionFileService $fileService,
 		private readonly WorldDataService $worldDataService,
 	)
@@ -110,6 +112,37 @@ class VersionsController extends BaseV1Controller
 			: $this->versionRepository->getPublic();
 
 		return $response->writeJsonBody(VersionResponse::fromArray($versions));
+	}
+
+	/**
+	 * Per-version plan statistics for the signed-in user (home page cards: "N plans",
+	 * "last edited …"), computed with one grouped query instead of loading every plan
+	 * tree. Keyed by version UUID; versions without plans are absent (= 0 plans).
+	 * Top-level plans are counted; folders and subplans are not. Must stay declared above
+	 * detail(): Apitte matches routes in declaration order and `/{uuid}` would otherwise
+	 * swallow this path.
+	 */
+	#[Path('/plan-counts')]
+	#[Method('GET')]
+	public function planCounts(ApiRequest $request, ApiResponse $response): ApiResponse
+	{
+		/** @var User|null $user */
+		$user = $request->getAttribute('user');
+		if ($user === null) {
+			return $response->withStatus(IResponse::S401_Unauthorized)
+				->writeJsonBody(['error' => 'Unauthorized']);
+		}
+
+		$versions = [];
+		foreach ($this->planRepository->getSummaryByVersionForUser($user) as $versionId => $summary) {
+			$versions[$versionId] = [
+				'planCount' => $summary['planCount'],
+				'lastPlanUpdatedAt' => $summary['lastUpdatedAt']->format('c'),
+			];
+		}
+
+		// An empty map must serialize as {} rather than [].
+		return $response->writeJsonBody(['versions' => (object) $versions]);
 	}
 
 	/**

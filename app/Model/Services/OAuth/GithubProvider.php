@@ -3,9 +3,9 @@
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
 /**
- * GitHub OAuth2. Scopes: `read:user user:email`. We read the numeric account id and the
+ * GitHub OAuth2. Scopes: `read:user user:email`. We read the numeric account id, the
  * primary verified email (GitHub may hide the email on the profile, so we query the
- * dedicated emails endpoint).
+ * dedicated emails endpoint) and, for display, the GitHub login and avatar.
  * @see https://docs.github.com/en/apps/oauth-apps/building-oauth-apps
  */
 class GithubProvider extends AbstractOAuthProvider
@@ -66,7 +66,10 @@ class GithubProvider extends AbstractOAuthProvider
 			throw new OAuthException('GitHub did not return an account id');
 		}
 
-		return new OAuthUserInfo($id, $this->resolveEmail($authHeader));
+		$nickname = isset($user['login']) ? (string) $user['login'] : null;
+		$avatarUrl = isset($user['avatar_url']) ? (string) $user['avatar_url'] : null;
+
+		return new OAuthUserInfo($id, $this->resolveEmail($authHeader), $nickname, $avatarUrl);
 	}
 
 	/** @param array<string, string> $authHeader */

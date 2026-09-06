@@ -3,7 +3,10 @@
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
 /**
- * Google OpenID Connect. Scope: `openid email`. We read the `sub` id and verified email.
+ * Google OpenID Connect. Scopes: `openid email profile`. We read the `sub` id, the
+ * verified email and, for display, the given name and profile picture (`profile` is
+ * what makes Google return those two; it adds "see your personal info" to the consent
+ * screen).
  * @see https://developers.google.com/identity/protocols/oauth2/openid-connect
  */
 class GoogleProvider extends AbstractOAuthProvider
@@ -31,7 +34,7 @@ class GoogleProvider extends AbstractOAuthProvider
 			'client_id' => $this->clientId,
 			'redirect_uri' => $redirectUri,
 			'response_type' => 'code',
-			'scope' => 'openid email',
+			'scope' => 'openid email profile',
 			'state' => $state,
 			// keeps the flow non-offline; we never store Google tokens
 			'access_type' => 'online',
@@ -71,7 +74,13 @@ class GoogleProvider extends AbstractOAuthProvider
 			$email = strtolower((string) $user['email']);
 		}
 
-		return new OAuthUserInfo($id, $email);
+		$nickname = (string) ($user['given_name'] ?? '');
+		if ($nickname === '') {
+			$nickname = (string) ($user['name'] ?? '');
+		}
+		$avatarUrl = isset($user['picture']) ? (string) $user['picture'] : null;
+
+		return new OAuthUserInfo($id, $email, $nickname !== '' ? $nickname : null, $avatarUrl);
 	}
 
 }

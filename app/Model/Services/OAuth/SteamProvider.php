@@ -9,13 +9,25 @@ namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
  *
  * OpenID 2.0 has no `state` parameter, so we carry our CSRF state inside the `return_to`
  * URL, which Steam signs and echoes back verbatim.
+ *
+ * The persona name and avatar are not part of OpenID; they come from the Steam Web API
+ * and require an API key (`oauthSteamApiKey`). Without a key, sign-in still works and
+ * simply records no nickname.
  * @see https://partner.steamgames.com/doc/features/auth#website
+ * @see https://developer.valvesoftware.com/wiki/Steam_Web_API#GetPlayerSummaries_.28v0002.29
  */
 class SteamProvider extends AbstractOAuthProvider
 {
 
 	private const OpenIdEndpoint = 'https://steamcommunity.com/openid/login';
 	private const ClaimedIdPrefix = 'https://steamcommunity.com/openid/id/';
+	private const PlayerSummariesUrl = 'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/';
+
+	public function __construct(
+		private readonly string $apiKey = '',
+	)
+	{
+	}
 
 	public function getKey(): string
 	{
@@ -52,7 +64,41 @@ class SteamProvider extends AbstractOAuthProvider
 			throw new OAuthException('Steam authentication could not be verified');
 		}
 
-		return new OAuthUserInfo($steamId, null);
+		[$nickname, $avatarUrl] = $this->fetchProfile($steamId);
+
+		return new OAuthUserInfo($steamId, null, $nickname, $avatarUrl);
+	}
+
+	/**
+	 * Best-effort lookup of the public persona name and avatar. A missing key or a Web API
+	 * hiccup must never break sign-in, so failures degrade to "no nickname".
+	 *
+	 * @return array{0: string|null, 1: string|null} [personaName, avatarUrl]
+	 */
+	private function fetchProfile(string $steamId): array
+	{
+		if ($this->apiKey === '') {
+			return [null, null];
+		}
+
+		try {
+			$data = $this->getJson(self::PlayerSummariesUrl . '?' . http_build_query([
+				'key' => $this->apiKey,
+				'steamids' => $steamId,
+			]));
+		} catch (OAuthException) {
+			return [null, null];
+		}
+
+		$player = $data['response']['players'][0] ?? null;
+		if (!is_array($player)) {
+			return [null, null];
+		}
+
+		return [
+			isset($player['personaname']) ? (string) $player['personaname'] : null,
+			isset($player['avatarfull']) ? (string) $player['avatarfull'] : null,
+		];
 	}
 
 	/**

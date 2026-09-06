@@ -28,6 +28,8 @@ Then edit `config/local.neon` and set:
 - `jwtSecret` - a long random string (>= 32 chars) used to sign access tokens
 - `oauthCallbackBaseUrl` - the frontend page that receives provider redirects
 - the `oauth*ClientId` / `oauth*ClientSecret` pairs for the providers you enable
+- optionally `oauthSteamApiKey` (Steam Web API key) so Steam sign-ins record the persona
+  name and avatar for display; sign-in works without it
 - the database `user` / `password` under `nettrine.dbal.connections.default`
 
 The database name (`sftools`) and connection defaults live in `config/common.neon`.
@@ -57,7 +59,10 @@ Endpoints (v1)
 - `POST /v1/auth/{register,login,refresh,logout,forgot-password,reset-password}`
 - `GET|POST /v1/auth/oauth/{providers,{provider}/start,{provider}/callback,connections}`,
   `DELETE /v1/auth/oauth/{provider}` - third-party sign-in (Steam, Discord, GitHub, Google)
+- `GET|PUT /v1/account` - the signed-in user's profile (resolved greeting name, provider
+  nicknames/avatars) and their self-chosen display name (see docs/account-and-plan-counts.md)
 - `GET|POST /v1/versions` - list / create custom game versions
+- `GET /v1/versions/plan-counts` - per-version plan count + last-edit time for the signed-in user
 - `GET /v1/versions/{uuid}` - fetch any version by UUID (public; used to load shared versions)
 - `POST /v1/versions/world-data` - preview resource-node counts (by type & purity) for a
   seed/mode/purity, via the external world-data-generator (see world-data.md)

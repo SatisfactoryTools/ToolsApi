@@ -98,7 +98,7 @@ class OAuthService
 	}
 
 	/**
-	 * @return list<array{provider: string, email: string|null, connectedAt: string, canDisconnect: bool}>
+	 * @return list<array{provider: string, email: string|null, nickname: string|null, avatarUrl: string|null, connectedAt: string, canDisconnect: bool}>
 	 */
 	public function listConnections(User $user): array
 	{
@@ -113,6 +113,8 @@ class OAuthService
 			$result[] = [
 				'provider' => $identity->provider,
 				'email' => $identity->email,
+				'nickname' => $identity->nickname,
+				'avatarUrl' => $identity->avatarUrl,
 				'connectedAt' => $identity->createdAt->format(DATE_ATOM),
 				'canDisconnect' => $removable,
 			];
@@ -148,6 +150,8 @@ class OAuthService
 		$existing = $this->identityRepository->getByProviderAccount($providerKey, $info->providerUserId);
 		if ($existing !== null) {
 			if ($existing->user->id === $user->id) {
+				$this->refreshProfile($existing, $info);
+
 				return OAuthCallbackResult::linkedTo($user, $providerKey); // already linked — idempotent
 			}
 			throw new OAuthException('This ' . $providerKey . ' account is already linked to another user');
@@ -167,6 +171,8 @@ class OAuthService
 	{
 		$identity = $this->identityRepository->getByProviderAccount($providerKey, $info->providerUserId);
 		if ($identity !== null) {
+			$this->refreshProfile($identity, $info);
+
 			return OAuthCallbackResult::authenticated(
 				$identity->user,
 				$this->authService->issueTokensForUser($identity->user),
@@ -199,11 +205,34 @@ class OAuthService
 		$identity->providerUserId = $info->providerUserId;
 		$identity->user = $user;
 		$identity->email = $info->email;
+		$identity->nickname = $info->nickname;
+		$identity->avatarUrl = $info->avatarUrl;
 		$identity->createdAt = new DateTimeImmutable();
 
 		$this->identityRepository->save($identity);
 
 		return $identity;
+	}
+
+	/**
+	 * Keeps the stored nickname/avatar in step with the provider on every sign-in through
+	 * it. A provider that reports nothing this time (e.g. Steam without an API key) keeps
+	 * whatever was stored before rather than wiping it.
+	 */
+	private function refreshProfile(OAuthIdentity $identity, OAuthUserInfo $info): void
+	{
+		$changed = false;
+		if ($info->nickname !== null && $info->nickname !== $identity->nickname) {
+			$identity->nickname = $info->nickname;
+			$changed = true;
+		}
+		if ($info->avatarUrl !== null && $info->avatarUrl !== $identity->avatarUrl) {
+			$identity->avatarUrl = $info->avatarUrl;
+			$changed = true;
+		}
+		if ($changed) {
+			$this->identityRepository->save($identity);
+		}
 	}
 
 	private function createUserFromOAuth(string $email): User

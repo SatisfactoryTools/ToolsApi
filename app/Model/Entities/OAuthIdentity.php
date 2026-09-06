@@ -35,6 +35,18 @@ class OAuthIdentity
 	#[ORM\Column(length: 255, nullable: true)]
 	public ?string $email = null;
 
+	/**
+	 * Human-readable name at the provider (Discord global name, GitHub login, Google
+	 * given name, Steam persona name), captured at link time and refreshed on every
+	 * sign-in through this provider. Display only — never used for matching.
+	 */
+	#[ORM\Column(length: 100, nullable: true)]
+	public ?string $nickname = null;
+
+	/** Provider avatar image URL, refreshed alongside the nickname. */
+	#[ORM\Column(length: 512, nullable: true)]
+	public ?string $avatarUrl = null;
+
 	#[ORM\Column]
 	public DateTimeImmutable $createdAt;
 

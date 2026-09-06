@@ -25,6 +25,13 @@ class User
 	#[ORM\Column(length: 255, nullable: true)]
 	public ?string $passwordHash = null;
 
+	/**
+	 * Name the user chose to be shown as (navbar, greetings). Optional; when unset the
+	 * frontend falls back to the login or a provider nickname — see AccountController.
+	 */
+	#[ORM\Column(length: 50, nullable: true)]
+	public ?string $displayName = null;
+
 	#[ORM\Column]
 	public DateTimeImmutable $createdAt;
 
