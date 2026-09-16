@@ -69,7 +69,9 @@ Endpoints (v1)
 - `GET|POST|PUT|DELETE /v1/versions/{version}/folders...` and `.../plans...`
 - `GET|POST|PUT|DELETE /v1/mods` and `.../{uuid}/versions...`
 - `GET|PUT /v1/settings` - per-user settings blob
-- `POST /v1/shares` - freeze a folder/plan subtree into a read-only, point-in-time share;
+- `POST /v1/shares` - freeze a folder/plan subtree into a read-only, point-in-time share,
+  either by id (the caller's own tree, needs a token) or from a tree sent with the request
+  (no account needed; see docs/anonymous-shares.md);
   `GET /v1/shares/{uuid}` - load a share (public, no auth)
 - `GET /v1/shares/visited`, `PUT|DELETE /v1/shares/visited/{uuid}` - the user's
   visited-shares list (capped at 20 entries; see docs/shared-plans-api.md)

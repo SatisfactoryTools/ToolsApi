@@ -13,6 +13,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Repositories\FolderRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
+use greeny\SatisfactoryTools\Api\Model\Services\ShareInputException;
 use greeny\SatisfactoryTools\Api\Model\Services\ShareService;
 use Nette\Http\IResponse;
 use Ramsey\Uuid\Uuid;
@@ -22,6 +23,14 @@ class SharesController extends BaseV1Controller
 {
 
 	private const TYPES = ['folder', 'plan'];
+
+	/**
+	 * Cap on the raw body of a share created from a client-sent tree. The endpoint is the
+	 * only unauthenticated write that stores what the caller sends, so the stored snapshot
+	 * has to be bounded; ShareService caps the shape of the tree on top of this. A plan
+	 * tree that trips this is far beyond anything the planner produces.
+	 */
+	private const BODY_MAX_BYTES = 1048576;
 
 	public function __construct(
 		private readonly ShareService $shareService,
@@ -34,8 +43,13 @@ class SharesController extends BaseV1Controller
 
 	/**
 	 * Creates a point-in-time share of a folder or plan (and everything under it) and
-	 * returns the share UUID. Requires ownership of the target.
-	 * Body: { version: uuid, type: 'folder'|'plan', id: uuid }
+	 * returns the share UUID. Two body shapes, both ending in the same frozen snapshot:
+	 *
+	 * - { version, type, id } — freezes the caller's own folder/plan tree. Requires an
+	 *   access token and ownership of the target.
+	 * - { version, type, root } — freezes the tree sent with the request, in the node
+	 *   shape GET /v1/shares/{uuid} returns. Needs no account (a signed-out user's plans
+	 *   live only in their browser); a token, when sent, records the creator.
 	 */
 	#[Path('/')]
 	#[Method('POST')]
@@ -43,14 +57,17 @@ class SharesController extends BaseV1Controller
 	{
 		/** @var User|null $user */
 		$user = $request->getAttribute('user');
-		if ($user === null) {
-			return $response->withStatus(IResponse::S401_Unauthorized)
-				->writeJsonBody(['error' => 'Unauthorized']);
+
+		$raw = (string) $request->getBody();
+		if (strlen($raw) > self::BODY_MAX_BYTES) {
+			return $response->withStatus(IResponse::S413_RequestEntityTooLarge)
+				->writeJsonBody(['error' => 'The shared tree is too large (at most ' . intdiv(self::BODY_MAX_BYTES, 1024) . ' kB)']);
 		}
 
-		$body = $this->parseBody($request);
+		$body = $this->parseBodyString($raw);
 		$type = trim((string) ($body['type'] ?? ''));
 		$versionId = trim((string) ($body['version'] ?? ''));
+		$hasRoot = array_key_exists('root', $body);
 		$id = trim((string) ($body['id'] ?? ''));
 
 		if (!in_array($type, self::TYPES, true)) {
@@ -58,14 +75,24 @@ class SharesController extends BaseV1Controller
 				->writeJsonBody(['error' => "Field type must be one of: " . implode(', ', self::TYPES)]);
 		}
 
-		if ($versionId === '' || $id === '') {
+		if ($versionId === '') {
 			return $response->withStatus(IResponse::S400_BadRequest)
-				->writeJsonBody(['error' => 'Fields version and id are required']);
+				->writeJsonBody(['error' => 'Field version is required']);
 		}
 
-		if (!Uuid::isValid($versionId) || !Uuid::isValid($id)) {
+		if (!Uuid::isValid($versionId)) {
 			return $response->withStatus(IResponse::S400_BadRequest)
-				->writeJsonBody(['error' => 'Fields version and id must be valid UUIDs']);
+				->writeJsonBody(['error' => 'Field version must be a valid UUID']);
+		}
+
+		if ($hasRoot && $id !== '') {
+			return $response->withStatus(IResponse::S400_BadRequest)
+				->writeJsonBody(['error' => 'Provide either id (a tree stored on the server) or root (a tree sent with the request), not both']);
+		}
+
+		if (!$hasRoot && $id === '') {
+			return $response->withStatus(IResponse::S400_BadRequest)
+				->writeJsonBody(['error' => 'Field id or root is required']);
 		}
 
 		$version = $this->versionRepository->getByUuid($versionId);
@@ -74,20 +101,40 @@ class SharesController extends BaseV1Controller
 				->writeJsonBody(['error' => 'Version not found']);
 		}
 
-		if ($type === 'folder') {
-			$folder = $this->folderRepository->getByUuidAndUserAndVersion(Uuid::fromString($id), $user, $version);
-			if ($folder === null) {
-				return $response->withStatus(IResponse::S404_NotFound)
-					->writeJsonBody(['error' => 'Folder not found']);
+		if ($hasRoot) {
+			try {
+				$share = $this->shareService->shareTree($user, $version, $type, $body['root']);
+			} catch (ShareInputException $e) {
+				// The message is written for the end user; the frontend shows it as is.
+				return $response->withStatus(IResponse::S400_BadRequest)
+					->writeJsonBody(['error' => $e->getMessage()]);
 			}
-			$share = $this->shareService->shareFolder($user, $version, $folder);
 		} else {
-			$plan = $this->planRepository->getByUuidAndUserAndVersion(Uuid::fromString($id), $user, $version);
-			if ($plan === null) {
-				return $response->withStatus(IResponse::S404_NotFound)
-					->writeJsonBody(['error' => 'Plan not found']);
+			if ($user === null) {
+				return $response->withStatus(IResponse::S401_Unauthorized)
+					->writeJsonBody(['error' => 'Unauthorized']);
 			}
-			$share = $this->shareService->sharePlan($user, $version, $plan);
+
+			if (!Uuid::isValid($id)) {
+				return $response->withStatus(IResponse::S400_BadRequest)
+					->writeJsonBody(['error' => 'Field id must be a valid UUID']);
+			}
+
+			if ($type === 'folder') {
+				$folder = $this->folderRepository->getByUuidAndUserAndVersion(Uuid::fromString($id), $user, $version);
+				if ($folder === null) {
+					return $response->withStatus(IResponse::S404_NotFound)
+						->writeJsonBody(['error' => 'Folder not found']);
+				}
+				$share = $this->shareService->shareFolder($user, $version, $folder);
+			} else {
+				$plan = $this->planRepository->getByUuidAndUserAndVersion(Uuid::fromString($id), $user, $version);
+				if ($plan === null) {
+					return $response->withStatus(IResponse::S404_NotFound)
+						->writeJsonBody(['error' => 'Plan not found']);
+				}
+				$share = $this->shareService->sharePlan($user, $version, $plan);
+			}
 		}
 
 		return $response->withStatus(IResponse::S201_Created)->writeJsonBody([

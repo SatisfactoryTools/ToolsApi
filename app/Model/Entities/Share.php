@@ -23,10 +23,14 @@ class Share
 	use Identifier;
 	use Uuid;
 
-	/** The creator of the share. */
+	/**
+	 * The creator of the share, or null when it was created by a signed-out visitor from
+	 * a tree sent with the request (see ShareService::shareTree()). Nothing about reading
+	 * a share depends on this — the snapshot below is self-contained.
+	 */
 	#[ORM\ManyToOne(targetEntity: User::class)]
-	#[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-	public User $user;
+	#[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+	public ?User $user = null;
 
 	/** What was shared at the root of the tree: 'folder' | 'plan'. */
 	#[ORM\Column(length: 16)]

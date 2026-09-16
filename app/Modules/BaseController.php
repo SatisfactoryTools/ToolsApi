@@ -19,7 +19,17 @@ abstract class BaseController implements IController
 	/** @return array<string, mixed> */
 	protected function parseBody(ApiRequest $request): array
 	{
-		$body = (string) $request->getBody();
+		return $this->parseBodyString((string) $request->getBody());
+	}
+
+	/**
+	 * parseBody() for callers that already hold the raw body (e.g. to measure it before
+	 * decoding) — the request stream is only worth reading once.
+	 *
+	 * @return array<string, mixed>
+	 */
+	protected function parseBodyString(string $body): array
+	{
 		if ($body === '') {
 			return [];
 		}
