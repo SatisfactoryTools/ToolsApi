@@ -32,6 +32,13 @@ class User
 	#[ORM\Column(length: 50, nullable: true)]
 	public ?string $displayName = null;
 
+	/**
+	 * May create and edit help articles. Set by hand in the database; there is no role
+	 * system and no way to grant it through the API.
+	 */
+	#[ORM\Column]
+	public bool $helpEditor = false;
+
 	#[ORM\Column]
 	public DateTimeImmutable $createdAt;
 

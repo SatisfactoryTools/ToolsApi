@@ -8,8 +8,6 @@ use greeny\SatisfactoryTools\Api\Model\Entities\Plan;
 use greeny\SatisfactoryTools\Api\Model\Entities\Share;
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
-use greeny\SatisfactoryTools\Api\Model\Repositories\FolderRepository;
-use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\SharedVisitRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\ShareRepository;
 use JsonException;
@@ -49,8 +47,7 @@ class ShareService
 	private const NAME_MAX_LENGTH = 255;
 
 	public function __construct(
-		private readonly FolderRepository $folderRepository,
-		private readonly PlanRepository $planRepository,
+		private readonly PlanTreeBuilder $treeBuilder,
 		private readonly ShareRepository $shareRepository,
 		private readonly SharedVisitRepository $sharedVisitRepository,
 	)
@@ -60,17 +57,17 @@ class ShareService
 	/** Freezes a folder and everything under it into a new share. */
 	public function shareFolder(User $user, Version $version, Folder $folder): Share
 	{
-		$index = $this->indexTree($user, $version);
+		$index = $this->treeBuilder->index($user, $version);
 
-		return $this->persist($user, 'folder', $version, $this->buildFolderNode($folder, $index));
+		return $this->persist($user, 'folder', $version, $this->treeBuilder->folderNode($folder, $index));
 	}
 
 	/** Freezes a plan (or subplan) and all of its subplans into a new share. */
 	public function sharePlan(User $user, Version $version, Plan $plan): Share
 	{
-		$index = $this->indexTree($user, $version);
+		$index = $this->treeBuilder->index($user, $version);
 
-		return $this->persist($user, 'plan', $version, $this->buildPlanNode($plan, $index));
+		return $this->persist($user, 'plan', $version, $this->treeBuilder->planNode($plan, $index));
 	}
 
 	/**
@@ -228,14 +225,7 @@ class ShareService
 	private function persist(?User $user, string $type, Version $version, array $root, ?DateTimeImmutable $createdAt = null): Share
 	{
 		$snapshot = [
-			'version' => [
-				'id' => $version->uuid->toString(),
-				'name' => $version->name,
-				'slug' => $version->slug,
-				'experimental' => $version->experimental,
-				'custom' => $version->custom,
-				'ficsmas' => $version->ficsmas,
-			],
+			'version' => $this->treeBuilder->versionSnapshot($version),
 			'root' => $root,
 		];
 
@@ -254,81 +244,6 @@ class ShareService
 		$this->shareRepository->save($share);
 
 		return $share;
-	}
-
-	/**
-	 * Loads every folder and plan the user owns in this version once, and indexes them by
-	 * parent so the tree can be walked without further queries.
-	 *
-	 * @return array{childFolders: array<int, Folder[]>, folderPlans: array<int, Plan[]>, subplans: array<int, Plan[]>}
-	 */
-	private function indexTree(User $user, Version $version): array
-	{
-		$childFolders = [];
-		foreach ($this->folderRepository->getByUserAndVersion($user, $version) as $folder) {
-			if ($folder->parent !== null) {
-				$childFolders[$folder->parent->id][] = $folder;
-			}
-		}
-
-		$folderPlans = [];
-		$subplans = [];
-		foreach ($this->planRepository->getByUserAndVersion($user, $version) as $plan) {
-			if ($plan->parent !== null) {
-				$subplans[$plan->parent->id][] = $plan;
-			} elseif ($plan->folder !== null) {
-				$folderPlans[$plan->folder->id][] = $plan;
-			}
-		}
-
-		return ['childFolders' => $childFolders, 'folderPlans' => $folderPlans, 'subplans' => $subplans];
-	}
-
-	/**
-	 * @param array{childFolders: array<int, Folder[]>, folderPlans: array<int, Plan[]>, subplans: array<int, Plan[]>} $index
-	 * @return array<string, mixed>
-	 */
-	private function buildFolderNode(Folder $folder, array $index): array
-	{
-		$children = [];
-		foreach ($index['childFolders'][$folder->id] ?? [] as $child) {
-			$children[] = $this->buildFolderNode($child, $index);
-		}
-
-		$plans = [];
-		foreach ($index['folderPlans'][$folder->id] ?? [] as $plan) {
-			$plans[] = $this->buildPlanNode($plan, $index);
-		}
-
-		return [
-			'id' => $folder->uuid->toString(),
-			'name' => $folder->name,
-			'data' => $folder->data,
-			'createdAt' => $folder->createdAt->format('c'),
-			'children' => $children,
-			'plans' => $plans,
-		];
-	}
-
-	/**
-	 * @param array{childFolders: array<int, Folder[]>, folderPlans: array<int, Plan[]>, subplans: array<int, Plan[]>} $index
-	 * @return array<string, mixed>
-	 */
-	private function buildPlanNode(Plan $plan, array $index): array
-	{
-		$subplans = [];
-		foreach ($index['subplans'][$plan->id] ?? [] as $subplan) {
-			$subplans[] = $this->buildPlanNode($subplan, $index);
-		}
-
-		return [
-			'id' => $plan->uuid->toString(),
-			'name' => $plan->name,
-			'description' => $plan->description,
-			'data' => $plan->data,
-			'createdAt' => $plan->createdAt->format('c'),
-			'subplans' => $subplans,
-		];
 	}
 
 	/**

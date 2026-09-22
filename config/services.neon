@@ -23,6 +23,17 @@ services:
 
 	- greeny\SatisfactoryTools\Api\Model\Services\ModDataStorage(%appDir%/../www)
 
+	- greeny\SatisfactoryTools\Api\Model\Services\HelpImageStorage(%appDir%/../www)
+
+	- greeny\SatisfactoryTools\Api\Model\Services\HelpSnapshotService(
+		wwwDir: %appDir%/../www,
+		lockDir: %tempDir%/locks
+	)
+
+	- greeny\SatisfactoryTools\Api\Model\Services\PlanTreeBuilder
+
+	- greeny\SatisfactoryTools\Api\Model\Services\PlanLinkService
+
 	- greeny\SatisfactoryTools\Api\Model\Services\ShareService
 
 	worldDataService:

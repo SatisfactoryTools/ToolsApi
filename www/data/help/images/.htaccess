@@ -1,0 +1,5 @@
+# Screenshots are stored under a generated uuid name and never rewritten - a new image
+# means a new URL - so they may be cached indefinitely.
+<IfModule mod_headers.c>
+	Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>

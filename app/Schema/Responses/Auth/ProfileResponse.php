@@ -28,6 +28,8 @@ class ProfileResponse
 		public readonly string $name,
 		public readonly ?string $avatarUrl,
 		public readonly bool $hasPassword,
+		/** Whether this account may write help articles; see HelpController. */
+		public readonly bool $helpEditor,
 		public readonly string $createdAt,
 		public readonly array $connections,
 	)
@@ -60,6 +62,7 @@ class ProfileResponse
 			name: $user->displayName ?? ($hasPassword ? $user->login : ($providerNickname ?? $user->login)),
 			avatarUrl: $avatarUrl,
 			hasPassword: $hasPassword,
+			helpEditor: $user->helpEditor,
 			createdAt: $user->createdAt->format('c'),
 			connections: $connections,
 		);
@@ -76,6 +79,7 @@ class ProfileResponse
 			'name' => $this->name,
 			'avatarUrl' => $this->avatarUrl,
 			'hasPassword' => $this->hasPassword,
+			'helpEditor' => $this->helpEditor,
 			'createdAt' => $this->createdAt,
 			'connections' => $this->connections,
 		];

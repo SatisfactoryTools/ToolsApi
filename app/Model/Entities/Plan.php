@@ -45,6 +45,15 @@ class Plan
 	#[ORM\Column]
 	public int $revision = 0;
 
+	/**
+	 * Whether anyone holding the plan's own URL may open it read-only (GET /v1/plans/{uuid}).
+	 * Defaults to true, for plans created before the column existed as well: a plan URL is
+	 * an unguessable UUID, and people hand it out expecting the recipient to see the plan.
+	 * The owner turns it off per plan in the share dialog.
+	 */
+	#[ORM\Column(options: ['default' => true])]
+	public bool $linkAccess = true;
+
 	#[ORM\ManyToOne(targetEntity: Folder::class)]
 	#[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
 	public ?Folder $folder = null;

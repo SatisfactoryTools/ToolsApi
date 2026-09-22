@@ -19,6 +19,7 @@ class PlanResponse extends ArrayableResponse
 		public readonly string $createdAt,
 		public readonly string $updatedAt,
 		public readonly int $revision,
+		public readonly bool $linkAccess,
 	)
 	{
 	}
@@ -36,6 +37,7 @@ class PlanResponse extends ArrayableResponse
 			createdAt: $entity->createdAt->format('c'),
 			updatedAt: $entity->getUpdatedAt()->format('c'),
 			revision: $entity->revision,
+			linkAccess: $entity->linkAccess,
 		);
 	}
 

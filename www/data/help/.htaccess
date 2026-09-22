@@ -1,0 +1,6 @@
+# The help manifest changes whenever an article is published and the reader loads it on
+# every page load, so it must always be revalidated. Article files are fetched with the
+# manifest's generatedAt as a cache buster, so revalidating them costs nothing either.
+<IfModule mod_headers.c>
+	Header set Cache-Control "no-cache"
+</IfModule>

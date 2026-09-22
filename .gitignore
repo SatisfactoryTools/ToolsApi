@@ -8,6 +8,7 @@
 !.htaccess
 
 # app
+maintenance.flag
 log/*
 temp/*
 vendor/*
@@ -22,3 +23,9 @@ www/data/versions/*
 !www/data/versions/custom/
 www/data/versions/custom/*
 !www/data/versions/custom/.htaccess
+!www/data/help/
+www/data/help/*
+!www/data/help/.htaccess
+!www/data/help/images/
+www/data/help/images/*
+!www/data/help/images/.htaccess

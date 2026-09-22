@@ -1,0 +1,137 @@
+name: CI
+
+on:
+    push:
+    pull_request:
+    workflow_dispatch:
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        # Skip duplicate runs for PRs from branches in this repo (the push event already builds them)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+        steps:
+            -   uses: actions/checkout@v5
+
+            -   uses: shivammathur/setup-php@v2
+                with:
+                    php-version: '8.5'
+                    extensions: curl, mysqli, json
+                    coverage: none
+
+            -   name: Validate composer.json and composer.lock
+                run: composer validate --strict
+
+            -   name: Install dependencies
+                run: composer install --no-dev --prefer-dist --optimize-autoloader --no-progress --no-interaction
+
+            -   name: Lint PHP sources
+                run: find app bin www -name '*.php' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
+
+            -   name: Pack release
+                if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+                run: tar -czf release.tar.gz app bin config vendor www composer.json composer.lock
+
+            -   name: Upload release artifact
+                if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+                uses: actions/upload-artifact@v4
+                with:
+                    name: release
+                    path: release.tar.gz
+                    retention-days: 1
+
+    deploy:
+        needs: build
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        runs-on: ubuntu-latest
+        concurrency:
+            group: production-deploy
+            cancel-in-progress: false
+        env:
+            DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+            PHP_BIN: ${{ vars.DEPLOY_PHP_BIN || 'php' }}
+        steps:
+            -   name: Download release artifact
+                uses: actions/download-artifact@v4
+                with:
+                    name: release
+
+            -   name: Unpack release
+                run: |
+                    mkdir -p release
+                    tar -xzf release.tar.gz -C release
+
+            -   name: Set up SSH
+                env:
+                    DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+                    DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+                run: |
+                    mkdir -p ~/.ssh
+                    printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+                    chmod 600 ~/.ssh/id_deploy
+                    ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+                    printf 'Host deploy-target\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n' \
+                      "$DEPLOY_HOST" "${{ secrets.DEPLOY_USER }}" >> ~/.ssh/config
+
+            # From here on the API answers every request with 503 until the last step removes the
+            # flag again; www/index.php checks for it before it boots anything.
+            -   name: Enable maintenance mode
+                run: ssh deploy-target "mkdir -p '$DEPLOY_PATH' && touch '$DEPLOY_PATH/maintenance.flag'"
+
+            -   name: Upload new version
+                run: |
+                    # Everything but the runtime state: local config, logs, cache and generated data
+                    # stay on the server (--delete would otherwise wipe them), as do dot-files in
+                    # the deploy root (.git, .htaccess, ...). Anything else up there that is not in
+                    # the repository is deleted.
+                    rsync -az --delete \
+                      --exclude='/maintenance.flag' \
+                      --exclude='/config/local.neon' \
+                      --exclude='/log/' \
+                      --exclude='/temp/' \
+                      --exclude='/www/data/' \
+                      --exclude='/.*' \
+                      release/ "deploy-target:$DEPLOY_PATH/"
+                    # www/data holds generated data, so it is synced without --delete - this only
+                    # refreshes the tracked .htaccess / .gitkeep files inside it.
+                    rsync -az release/www/data/ "deploy-target:$DEPLOY_PATH/www/data/"
+
+            -   name: Clear cache
+                run: ssh deploy-target "mkdir -p '$DEPLOY_PATH/log' '$DEPLOY_PATH/temp' && rm -rf '$DEPLOY_PATH/temp/cache'"
+
+            -   name: Update database schema
+                run: ssh deploy-target "cd '$DEPLOY_PATH' && $PHP_BIN bin/console orm:schema-tool:update --dump-sql --force --no-interaction"
+
+            # Drops whatever the console run warmed up, so the first request rebuilds against the
+            # schema it just applied.
+            -   name: Clear cache again
+                run: ssh deploy-target "rm -rf '$DEPLOY_PATH/temp/cache'"
+
+            -   name: Disable maintenance mode
+                run: ssh deploy-target "rm -f '$DEPLOY_PATH/maintenance.flag'"
+
+            -   name: Smoke check
+                id: smoke
+                if: vars.DEPLOY_HEALTH_URL != ''
+                env:
+                    HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL }}
+                run: |
+                    for attempt in 1 2 3 4 5; do
+                      code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$HEALTH_URL" || echo 000)"
+                      echo "attempt $attempt: HTTP $code"
+                      if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then
+                        exit 0
+                      fi
+                      sleep 5
+                    done
+                    echo "::error::$HEALTH_URL answered HTTP $code after the deploy. The new version is live - check the server logs, and run 'touch $DEPLOY_PATH/maintenance.flag' to take the API down while you fix it."
+                    exit 1
+
+            -   name: Report interrupted deploy
+                if: failure() && steps.smoke.outcome != 'failure'
+                run: |
+                    echo "::error::The deploy failed. The API may still be in maintenance mode - once it is fixed, clear it with 'rm -f $DEPLOY_PATH/maintenance.flag' on the server."

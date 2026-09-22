@@ -134,6 +134,8 @@ class PlansController extends BaseV1Controller
 		$plan->folder = $folder;
 		$plan->parent = $parent;
 		$plan->data = $data;
+		// Absent means "open": the flag is younger than the clients that create plans.
+		$plan->linkAccess = (bool) ($body['linkAccess'] ?? true);
 		$plan->createdAt = new DateTimeImmutable();
 		$plan->updatedAt = $plan->createdAt;
 
@@ -235,6 +237,10 @@ class PlansController extends BaseV1Controller
 
 		if (isset($body['data'])) {
 			$plan->data = (string) $body['data'];
+		}
+
+		if (isset($body['linkAccess'])) {
+			$plan->linkAccess = (bool) $body['linkAccess'];
 		}
 
 		$plan->revision++;

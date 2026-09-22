@@ -146,11 +146,14 @@ class VersionsController extends BaseV1Controller
 	}
 
 	/**
-	 * Returns a single version by UUID, regardless of any account links. Public and
-	 * unauthenticated: the version UUID acts as an unguessable capability, and the
-	 * version's data file is served statically anyway. Only versions are exposed here —
+	 * Returns a single version by UUID or by URL slug, regardless of any account links.
+	 * Public and unauthenticated: the version UUID acts as an unguessable capability, and
+	 * the version's data file is served statically anyway. Only versions are exposed here —
 	 * never user content. Note the returned dataPath may point to a pruned file; use
 	 * POST /versions/{uuid}/data to (re)materialize it.
+	 *
+	 * The slug form is what lets a plan link into a custom version open for someone who
+	 * has never seen that version: the planner URL carries the slug, nothing else.
 	 */
 	#[Path('/{uuid}')]
 	#[Method('GET')]
@@ -159,7 +162,9 @@ class VersionsController extends BaseV1Controller
 	{
 		$uuid = (string) $request->getParameter('uuid');
 
-		$version = Uuid::isValid($uuid) ? $this->versionRepository->getByUuid($uuid) : null;
+		$version = Uuid::isValid($uuid)
+			? $this->versionRepository->getByUuid($uuid)
+			: $this->versionRepository->getBySlug($uuid);
 		if ($version === null) {
 			return $response->withStatus(IResponse::S404_NotFound)
 				->writeJsonBody(['error' => 'Version not found']);

@@ -43,6 +43,16 @@ class VersionRepository extends BaseRepository
 	}
 
 	/** Looks up a version by its data file path (the idempotency key for imports). */
+	/**
+	 * A version by its URL slug (official ones like "latest-stable", and the
+	 * "custom-…" slug of a custom version). Used by the public detail endpoint, so a
+	 * link into a version the recipient does not have yet resolves from the URL alone.
+	 */
+	public function getBySlug(string $slug): ?Version
+	{
+		return $this->getRepository()->findOneBy(['slug' => $slug]);
+	}
+
 	public function getByDataPath(string $dataPath): ?Version
 	{
 		return $this->getRepository()->findOneBy(['dataPath' => $dataPath]);
