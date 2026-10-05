@@ -8,6 +8,10 @@ parameters:
 	# The per-provider callback is this value + "/{provider}".
 	oauthCallbackBaseUrl: 'https://tools.example.com/auth/callback'
 
+	# Optional: public base URL of this API for link preview images (default: production).
+	# publicApiUrl: 'https://api.sftools.local'
+
+	# See docs/oauth-provider-setup.md for how to obtain each of these.
 	oauthDiscordClientId: ''
 	oauthDiscordClientSecret: ''
 	oauthGithubClientId: ''

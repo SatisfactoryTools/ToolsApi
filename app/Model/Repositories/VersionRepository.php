@@ -4,6 +4,7 @@ namespace greeny\SatisfactoryTools\Api\Model\Repositories;
 
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
+use Ramsey\Uuid\Uuid;
 
 /** @extends BaseRepository<Version> */
 class VersionRepository extends BaseRepository
@@ -37,11 +38,26 @@ class VersionRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['uuid' => $uuid]);
 	}
 
+	/**
+	 * A version by UUID or by URL slug - how a frontend URL names its version (the public
+	 * detail endpoint and link previews both take either).
+	 */
+	public function getBySlugOrUuid(string $slugOrUuid): ?Version
+	{
+		return Uuid::isValid($slugOrUuid) ? $this->getByUuid($slugOrUuid) : $this->getBySlug($slugOrUuid);
+	}
+
+	/**
+	 * A version by its URL slug (official ones like "latest-stable", and the
+	 * "custom-…" slug of a custom version). Used by the public detail endpoint, so a
+	 * link into a version the recipient does not have yet resolves from the URL alone.
+	 */
 	public function getBySlug(string $slug): ?Version
 	{
 		return $this->getRepository()->findOneBy(['slug' => $slug]);
 	}
 
+	/** Looks up a version by its data file path (the idempotency key for imports). */
 	public function getByDataPath(string $dataPath): ?Version
 	{
 		return $this->getRepository()->findOneBy(['dataPath' => $dataPath]);

@@ -152,6 +152,11 @@ Endpoints (v1)
   visited-shares list (capped at 20 entries; see docs/shared-plans-api.md)
 - `GET /v1/legacy-shares/{slug}` - a production line shared through the old
   satisfactorytools.com (public, no auth; see "Legacy shares" below)
+- `GET /v1/meta?path={frontend path}` - link preview metadata (title, description, image)
+  of a frontend page, for the frontend's `index.php` to print into `<head>`. Public, always
+  200 (defaults for anything unknown). Codex lookups use a per-version index kept in
+  `temp/cache`; image URLs are built from the `publicApiUrl` parameter. Text rules are
+  tested by `php tests/MetaTextTest.php`.
 
 Help articles
 -------------

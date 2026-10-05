@@ -135,9 +135,7 @@ class VersionsController extends BaseV1Controller
 	{
 		$uuid = (string) $request->getParameter('uuid');
 
-		$version = Uuid::isValid($uuid)
-			? $this->versionRepository->getByUuid($uuid)
-			: $this->versionRepository->getBySlug($uuid);
+		$version = $this->versionRepository->getBySlugOrUuid($uuid);
 		if ($version === null) {
 			return $response->withStatus(IResponse::S404_NotFound)
 				->writeJsonBody(['error' => 'Version not found']);

@@ -32,6 +32,13 @@ services:
 
 	- greeny\SatisfactoryTools\Api\Model\Services\PlanTreeBuilder
 
+	- greeny\SatisfactoryTools\Api\Model\Services\Meta\VersionMetaIndex(wwwDir: %appDir%/../www)
+
+	- greeny\SatisfactoryTools\Api\Model\Services\Meta\MetaResolver(
+		wwwDir: %appDir%/../www,
+		publicApiUrl: %publicApiUrl%
+	)
+
 	- greeny\SatisfactoryTools\Api\Model\Services\PlanLinkService
 
 	- greeny\SatisfactoryTools\Api\Model\Services\ShareService

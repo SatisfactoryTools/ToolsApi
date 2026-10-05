@@ -2,6 +2,10 @@ parameters:
 	# Optional secrets default to empty so existing local.neon files keep working.
 	oauthSteamApiKey: ''
 
+	# Public base URL of this API, for absolute image URLs in link previews (GET /v1/meta).
+	# Not derived from the request: the caller is the frontend's index.php, not a browser.
+	publicApiUrl: 'https://api.new.satisfactorytools.com'
+
 	jwt:
 		secret: %jwtSecret%
 		accessTokenTtl: 3600      # 1 hour

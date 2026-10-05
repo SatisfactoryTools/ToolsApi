@@ -113,8 +113,9 @@ class ShareService
 		return ['shares' => $shares];
 	}
 
-	/** Mirrors the frontend's icon rule (an explicit null iconClassName means no icon), so the visited list can carry icons without fetching every share. */
-	private function resolvePlanIcon(mixed $data): ?string
+	/** Mirrors the frontend's icon rule (an explicit null iconClassName means no icon), so the visited list can carry icons without fetching every share. * Link previews of shared plans (MetaResolver) use it too.
+	 */
+	public function resolvePlanIcon(mixed $data): ?string
 	{
 		if (!is_string($data)) {
 			return null;
