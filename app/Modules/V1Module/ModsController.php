@@ -39,7 +39,6 @@ class ModsController extends BaseV1Controller
 		/** @var User|null $user */
 		$user = $request->getAttribute('user');
 
-		// Authenticated users see public mods plus their own; guests see public mods only.
 		$mods = $user !== null
 			? $this->modRepository->getVisibleToUser($user)
 			: $this->modRepository->getPublic();

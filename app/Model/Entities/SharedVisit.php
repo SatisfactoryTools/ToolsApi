@@ -6,12 +6,7 @@ use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
 use greeny\SatisfactoryTools\Api\Model\Entities\Attributes\Identifier;
 
-/**
- * One entry in a user's "visited shares" list: this user opened this share, most
- * recently at $visitedAt. Only the visit itself is stored — type, name and version are
- * resolved from the (frozen) share at read time. The list is capped per user (see
- * ShareService::VISITED_CAP); the oldest entry is evicted when the cap is exceeded.
- */
+/** Only the visit is stored; type, name and version are resolved from the frozen share at read time. Capped per user (ShareService::VISITED_CAP), oldest evicted first. */
 #[ORM\Entity]
 #[ORM\Table(name: 'shared_visit')]
 #[ORM\UniqueConstraint(name: 'user_share', columns: ['user_id', 'share_id'])]

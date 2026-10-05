@@ -24,10 +24,6 @@ class OAuthController extends BaseV1Controller
 	{
 	}
 
-	/**
-	 * Lists the third-party providers this deployment has enabled, so the frontend can
-	 * render only the buttons that will actually work.
-	 */
 	#[Path('/providers')]
 	#[Method('GET')]
 	public function providers(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -35,11 +31,7 @@ class OAuthController extends BaseV1Controller
 		return $response->writeJsonBody(['providers' => $this->oauthService->getProviderKeys()]);
 	}
 
-	/**
-	 * Begins an authorization flow and returns the URL the browser should be sent to.
-	 * If a valid Bearer token is present, the flow links the provider to that account
-	 * instead of logging in / signing up.
-	 */
+	/** With a valid Bearer token, the flow links the provider to that account instead of logging in. */
 	#[Path('/{provider}/start')]
 	#[Method('POST')]
 	#[RequestParameter(name: 'provider', type: 'string', in: EndpointParameter::IN_PATH)]
@@ -63,10 +55,7 @@ class OAuthController extends BaseV1Controller
 		return $response->writeJsonBody($result);
 	}
 
-	/**
-	 * Completes an authorization flow. The frontend forwards the query parameters the
-	 * provider redirected back with (for Steam, all `openid.*` fields plus `state`).
-	 */
+	/** The frontend forwards the query parameters the provider redirected back with (for Steam, all `openid.*` fields plus `state`). */
 	#[Path('/{provider}/callback')]
 	#[Method('POST')]
 	#[RequestParameter(name: 'provider', type: 'string', in: EndpointParameter::IN_PATH)]
@@ -100,7 +89,6 @@ class OAuthController extends BaseV1Controller
 		);
 	}
 
-	/** Lists the current user's linked third-party connections. */
 	#[Path('/connections')]
 	#[Method('GET')]
 	public function connections(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -117,7 +105,6 @@ class OAuthController extends BaseV1Controller
 		]);
 	}
 
-	/** Removes a linked provider from the current user's account. */
 	#[Path('/{provider}')]
 	#[Method('DELETE')]
 	#[RequestParameter(name: 'provider', type: 'string', in: EndpointParameter::IN_PATH)]

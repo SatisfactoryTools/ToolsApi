@@ -19,15 +19,11 @@ class ModVersion
 	#[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
 	public Mod $mod;
 
-	/** Label of this mod version, e.g. "1.0.0". Need not match any game version. */
+	/** Need not match any game version. */
 	#[ORM\Column(length: 255)]
 	public string $name;
 
-	/**
-	 * Path (relative to the web root) of this mod version's data file, in the same format
-	 * as a game version data file. Null if the author has not uploaded data yet, in which
-	 * case the mod version merges nothing.
-	 */
+	/** Same format as a game version data file; null until the author uploads data, in which case nothing is merged. */
 	#[ORM\Column(nullable: true)]
 	public ?string $dataPath = null;
 

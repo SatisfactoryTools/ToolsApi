@@ -15,11 +15,7 @@ class ModRepository extends BaseRepository
 		return $this->getRepository()->findBy(['public' => true]);
 	}
 
-	/**
-	 * Public mods plus the user's own (private and public) mods.
-	 *
-	 * @return Mod[]
-	 */
+	/** @return Mod[] */
 	public function getVisibleToUser(User $user): array
 	{
 		return $this->getRepository()->createQueryBuilder('m')
@@ -30,7 +26,6 @@ class ModRepository extends BaseRepository
 			->getResult();
 	}
 
-	/** A mod by UUID, only if visible to the user (public, or owned by the user). */
 	public function getByUuidVisibleToUser(string $uuid, User $user): ?Mod
 	{
 		return $this->getRepository()->createQueryBuilder('m')
@@ -42,7 +37,6 @@ class ModRepository extends BaseRepository
 			->getOneOrNullResult();
 	}
 
-	/** A mod by UUID, only if owned by the user (for management operations). */
 	public function getByUuidAndOwner(string $uuid, User $user): ?Mod
 	{
 		return $this->getRepository()->findOneBy(['uuid' => $uuid, 'user' => $user]);

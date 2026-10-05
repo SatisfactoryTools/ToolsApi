@@ -21,7 +21,6 @@ class OAuthProviderRegistry
 		return isset($this->providers[$key]);
 	}
 
-	/** @throws OAuthException when the provider key is unknown */
 	public function get(string $key): OAuthProviderInterface
 	{
 		return $this->providers[$key] ?? throw new OAuthException('Unknown OAuth provider: ' . $key);

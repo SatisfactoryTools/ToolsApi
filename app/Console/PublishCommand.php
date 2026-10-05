@@ -16,25 +16,18 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-/**
- * Imports a build published by the extractor pipeline (see docs/api-handoff.md). For each
- * build it registers two official game versions — one without FICSMAS content and one with
- * it — pointing at the two data files already written to disk. Idempotent: re-running for
- * the same build updates the existing versions in place.
- */
 #[AsCommand(name: 'publish', description: 'Imports an extracted Satisfactory build as official game versions')]
 class PublishCommand extends Command
 {
 
 	private const BRANCHES = ['stable', 'experimental'];
 
-	/** The two parser variants delivered per build. */
 	private const VARIANTS = [
 		['suffix' => '', 'ficsmas' => false],
 		['suffix' => '-ficsmas', 'ficsmas' => true],
 	];
 
-	/** Matches the extractor's formatting: 4-space pretty-print, raw slashes and unicode. */
+	/** Matches the extractor's formatting. */
 	private const JSON_FLAGS = JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
 
 	public function __construct(
@@ -76,8 +69,7 @@ class PublishCommand extends Command
 			return Command::FAILURE;
 		}
 
-		// Resolve and verify both data files up front, so we never register one variant
-		// while the other is missing.
+		// Verify both data files up front, so we never register one variant while the other is missing.
 		$variants = [];
 		foreach (self::VARIANTS as $variant) {
 			$dataPath = sprintf('data/versions/%s-%s%s.json', $branch, $buildId, $variant['suffix']);
@@ -89,8 +81,7 @@ class PublishCommand extends Command
 			$variants[] = $variant + ['dataPath' => $dataPath, 'absolute' => $absolute];
 		}
 
-		// The resource nodes are the same for both variants (FICSMAS only adds seasonal
-		// recipes/items), so generate the vanilla world once and stamp it into both files.
+		// Resource nodes are the same for both variants (FICSMAS only adds seasonal recipes/items), so generate the world once and stamp it into both files.
 		$worldData = null;
 		if (!$input->getOption('skip-world-data')) {
 			$io->writeln('Generating world data (seed 0, mode none, purity no-change)...');
@@ -166,13 +157,7 @@ class PublishCommand extends Command
 		return $qualifiers === [] ? $name : $name . ' (' . implode(', ', $qualifiers) . ')';
 	}
 
-	/**
-	 * Fills the data file's reserved `metadata` object with the build info (and the world
-	 * node counts under metadata.world, when generated), writing atomically so a crash
-	 * cannot corrupt the extractor's file. Output keeps the extractor's pretty formatting.
-	 *
-	 * @param array<string, mixed>|null $worldData
-	 */
+	/** @param array<string, mixed>|null $worldData */
 	private function stampMetadata(
 		string $absolute,
 		string $buildId,

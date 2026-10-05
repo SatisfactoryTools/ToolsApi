@@ -21,12 +21,7 @@ class VersionRepository extends BaseRepository
 		return $this->getRepository()->findBy(['custom' => false]);
 	}
 
-	/**
-	 * Public (built-in) versions plus the custom versions the user has saved (linked)
-	 * to their account.
-	 *
-	 * @return Version[]
-	 */
+	/** @return Version[] */
 	public function getVisibleToUser(User $user): array
 	{
 		return $this->getRepository()->createQueryBuilder('v')
@@ -42,12 +37,6 @@ class VersionRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['uuid' => $uuid]);
 	}
 
-	/** Looks up a version by its data file path (the idempotency key for imports). */
-	/**
-	 * A version by its URL slug (official ones like "latest-stable", and the
-	 * "custom-…" slug of a custom version). Used by the public detail endpoint, so a
-	 * link into a version the recipient does not have yet resolves from the URL alone.
-	 */
 	public function getBySlug(string $slug): ?Version
 	{
 		return $this->getRepository()->findOneBy(['slug' => $slug]);
@@ -58,7 +47,6 @@ class VersionRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['dataPath' => $dataPath]);
 	}
 
-	/** An existing custom version with the exact same definition (dedup on create). */
 	public function getByDefinitionHash(string $definitionHash): ?Version
 	{
 		return $this->getRepository()->findOneBy(['definitionHash' => $definitionHash]);

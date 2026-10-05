@@ -23,19 +23,13 @@ class PlanRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['uuid' => $uuid, 'user' => $user, 'version' => $version]);
 	}
 
-	/** Any plan by UUID, whoever owns it — for the public link view (see PlanLinkService). */
 	public function getByUuid(UuidInterface $uuid): ?Plan
 	{
 		return $this->getRepository()->findOneBy(['uuid' => $uuid]);
 	}
 
 	/**
-	 * Per-version plan statistics for one user, in a single grouped query — cheap enough
-	 * for every home page visit. Only versions in which the user has at least one plan
-	 * appear. `planCount` counts top-level plans (subplans are excluded); `lastUpdatedAt`
-	 * spans every plan of the version, subplans included, since editing a subplan is
-	 * still work done in that version.
-	 *
+	 * `planCount` excludes subplans, but `lastUpdatedAt` includes them, since editing a subplan is still work done in that version.
 	 * @return array<string, array{planCount: int, lastUpdatedAt: DateTimeImmutable}> keyed by version UUID
 	 */
 	public function getSummaryByVersionForUser(User $user): array

@@ -6,20 +6,12 @@ use Ramsey\Uuid\UuidInterface;
 use RuntimeException;
 use finfo;
 
-/**
- * Stores screenshots used in help articles. The editor sends the bytes base64-encoded in
- * a JSON body (the rest of the API is JSON too, and screenshots are small), so what
- * arrives here is the decoded file. Files are written under a generated uuid name, so an
- * editor's file name never reaches the filesystem or a URL. Paths are relative to the web
- * root, matching HelpImage::$path.
- */
+/** Files are written under a generated uuid name, so an editor's file name never reaches the filesystem or a URL. */
 class HelpImageStorage
 {
 
-	/** Decoded size limit; a screenshot has no business being larger. */
 	public const MAX_SIZE = 4 * 1024 * 1024;
 
-	/** Accepted uploads, by sniffed MIME type, with the extension each one gets. */
 	private const EXTENSIONS = [
 		'image/png' => 'png',
 		'image/jpeg' => 'jpg',
@@ -35,21 +27,13 @@ class HelpImageStorage
 	{
 	}
 
-	/**
-	 * The extension for these bytes, from their real content - never from what the
-	 * editor called the file. Null when it is not an image type help articles accept.
-	 */
+	/** Sniffed from the real content, never from what the editor called the file. */
 	public function extensionFor(string $bytes): ?string
 	{
 		$mimeType = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
 		return $mimeType === false ? null : (self::EXTENSIONS[$mimeType] ?? null);
 	}
 
-	/**
-	 * Writes the image and returns its web-root-relative path.
-	 *
-	 * @throws RuntimeException when the file cannot be written
-	 */
 	public function store(UuidInterface $uuid, string $bytes, string $extension): string
 	{
 		$relativePath = self::DIR . '/' . $uuid->toString() . '.' . $extension;

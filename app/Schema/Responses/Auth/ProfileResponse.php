@@ -5,21 +5,10 @@ namespace greeny\SatisfactoryTools\Api\Schema\Responses\Auth;
 use greeny\SatisfactoryTools\Api\Model\Entities\OAuthIdentity;
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
 
-/**
- * The signed-in user's own profile. Carries both the raw pieces (login, displayName,
- * per-connection nickname) and a resolved `name` so the frontend can greet the user
- * without reimplementing the fallback order:
- *   1. displayName the user set themselves,
- *   2. login, when the account has a password (i.e. the user chose that login),
- *   3. the nickname of the earliest-connected provider that reported one,
- *   4. login (generated from the email for provider-only accounts).
- */
 class ProfileResponse
 {
 
-	/**
-	 * @param list<array{provider: string, nickname: string|null, avatarUrl: string|null}> $connections
-	 */
+	/** @param list<array{provider: string, nickname: string|null, avatarUrl: string|null}> $connections */
 	public function __construct(
 		public readonly string $id,
 		public readonly string $login,
@@ -28,7 +17,6 @@ class ProfileResponse
 		public readonly string $name,
 		public readonly ?string $avatarUrl,
 		public readonly bool $hasPassword,
-		/** Whether this account may write help articles; see HelpController. */
 		public readonly bool $helpEditor,
 		public readonly string $createdAt,
 		public readonly array $connections,
@@ -36,7 +24,7 @@ class ProfileResponse
 	{
 	}
 
-	/** @param list<OAuthIdentity> $identities in connection order (oldest first) */
+	/** @param list<OAuthIdentity> $identities oldest first */
 	public static function fromUser(User $user, array $identities): self
 	{
 		$connections = [];

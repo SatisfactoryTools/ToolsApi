@@ -19,7 +19,7 @@ use ReflectionProperty;
 class NullableTypedFieldMapper implements TypedFieldMapper
 {
 
-	/** @var array<class-string|ScalarName, class-string<Type>|string> $typedFieldMappings */
+	/** @var array<class-string|ScalarName, class-string<Type>|string> */
 	private array $typedFieldMappings;
 
 	private const array DEFAULT_TYPED_FIELD_MAPPINGS = [
@@ -44,9 +44,6 @@ class NullableTypedFieldMapper implements TypedFieldMapper
 		$this->typedFieldMappings = array_merge($defaultMappings, $typedFieldMappings);
 	}
 
-	/**
-	 * {@inheritDoc}
-	 */
 	public function validateAndComplete(array $mapping, ReflectionProperty $field): array
 	{
 		$type = $field->getType();

@@ -8,12 +8,7 @@ use Doctrine\ORM\Mapping as ORM;
 use greeny\SatisfactoryTools\Api\Model\Entities\Attributes\Identifier;
 use greeny\SatisfactoryTools\Api\Model\Entities\Attributes\Uuid;
 
-/**
- * A read-only, point-in-time share of a folder or plan subtree. The whole shared tree
- * (version info + folders/plans/subplans) is frozen into $snapshot at creation time, so
- * later edits to — or deletion of — the original rows never change what a share serves.
- * The share UUID is the only capability needed to view it (anyone with the link can read).
- */
+/** The whole shared tree is frozen into $snapshot at creation, so later edits or deletion of the original rows never change what a share serves. The UUID alone grants read access. */
 #[ORM\Entity]
 #[ORM\HasLifecycleCallbacks]
 #[ORM\Table(name: 'share')]
@@ -23,23 +18,16 @@ class Share
 	use Identifier;
 	use Uuid;
 
-	/**
-	 * The creator of the share, or null when it was created by a signed-out visitor from
-	 * a tree sent with the request (see ShareService::shareTree()). Nothing about reading
-	 * a share depends on this — the snapshot below is self-contained.
-	 */
+	/** Null when created by a signed-out visitor (ShareService::shareTree()); reading a share never depends on it. */
 	#[ORM\ManyToOne(targetEntity: User::class)]
 	#[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
 	public ?User $user = null;
 
-	/** What was shared at the root of the tree: 'folder' | 'plan'. */
+	/** 'folder' | 'plan' */
 	#[ORM\Column(length: 16)]
 	public string $type;
 
-	/**
-	 * Self-contained JSON snapshot of the shared subtree, captured when the share was
-	 * created (see ShareService). MEDIUMTEXT so large plan trees fit comfortably.
-	 */
+	/** MEDIUMTEXT so large plan trees fit. */
 	#[ORM\Column(type: Types::TEXT, length: 16_777_215)]
 	public string $snapshot;
 

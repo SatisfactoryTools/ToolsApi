@@ -21,15 +21,10 @@ class Mod
 	#[ORM\Column(length: 255)]
 	public string $name;
 
-	/**
-	 * Public mods are visible to everyone and can be added to anyone's custom versions,
-	 * but are managed only by their author. Private mods are visible to and usable by
-	 * their author only.
-	 */
+	/** Public mods are usable by anyone but managed only by their author; private ones are author-only. */
 	#[ORM\Column]
 	public bool $public = false;
 
-	/** The author / owner of the mod. */
 	#[ORM\ManyToOne(targetEntity: User::class)]
 	#[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
 	public User $user;

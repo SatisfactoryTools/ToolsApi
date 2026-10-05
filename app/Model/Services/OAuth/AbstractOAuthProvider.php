@@ -4,18 +4,13 @@ namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
 use JsonException;
 
-/**
- * Shared cURL helpers for the standard OAuth 2.0 providers. Dependency-free so the
- * project does not need to pull in an HTTP client.
- */
+/** Dependency-free cURL helpers, so the project does not need an HTTP client. */
 abstract class AbstractOAuthProvider implements OAuthProviderInterface
 {
 
 	private const UserAgent = 'SatisfactoryTools-API';
 
 	/**
-	 * POST an application/x-www-form-urlencoded body and decode a JSON response.
-	 *
 	 * @param array<string, string> $form
 	 * @param array<string, string> $headers
 	 * @return array<string, mixed>
@@ -28,8 +23,6 @@ abstract class AbstractOAuthProvider implements OAuthProviderInterface
 	}
 
 	/**
-	 * GET a JSON resource.
-	 *
 	 * @param array<string, string> $headers
 	 * @return array<string, mixed>
 	 */
@@ -38,11 +31,7 @@ abstract class AbstractOAuthProvider implements OAuthProviderInterface
 		return $this->request('GET', $url, null, $headers);
 	}
 
-	/**
-	 * POST an application/x-www-form-urlencoded body and return the raw response text.
-	 *
-	 * @param array<string, string> $form
-	 */
+	/** @param array<string, string> $form */
 	protected function postFormRaw(string $url, array $form): string
 	{
 		return $this->rawRequest('POST', $url, http_build_query($form), [
@@ -72,9 +61,7 @@ abstract class AbstractOAuthProvider implements OAuthProviderInterface
 		return $decoded;
 	}
 
-	/**
-	 * @param array<string, string> $headers
-	 */
+	/** @param array<string, string> $headers */
 	private function rawRequest(string $method, string $url, ?string $body, array $headers): string
 	{
 		$curlHeaders = [];

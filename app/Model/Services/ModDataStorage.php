@@ -6,11 +6,6 @@ use JsonException;
 use Ramsey\Uuid\UuidInterface;
 use RuntimeException;
 
-/**
- * Stores and removes the JSON data files of mod versions (files in the same format as a
- * game version data file, later merged into custom versions). Paths are relative to the
- * web root, matching ModVersion::$dataPath.
- */
 class ModDataStorage
 {
 
@@ -20,11 +15,7 @@ class ModDataStorage
 	{
 	}
 
-	/**
-	 * Writes the mod version data and returns its web-root-relative path.
-	 *
-	 * @param array<string, mixed> $data
-	 */
+	/** @param array<string, mixed> $data */
 	public function store(UuidInterface $modVersionUuid, array $data): string
 	{
 		$relativePath = 'data/mods/' . $modVersionUuid->toString() . '.json';

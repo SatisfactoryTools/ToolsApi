@@ -3,10 +3,7 @@
 use Contributte\Middlewares\Application\IApplication;
 use greeny\SatisfactoryTools\Api\Bootstrap;
 
-// Deploys create maintenance.flag in the project root while the code, the cache and the database
-// schema are being swapped, and remove it when the new version is ready. Checked before the
-// autoloader, so it holds even while vendor/ is half-written. Mirrors the error shape of
-// Apitte's SimpleErrorHandler and the headers of CorsMiddleware, so callers can read the reason.
+/* Deploys create maintenance.flag while code, cache and DB schema are being swapped. Checked before the autoloader, so it holds even while vendor/ is half-written. Mirrors the error shape of Apitte's SimpleErrorHandler and the headers of CorsMiddleware. */
 if (is_file(__DIR__ . '/../maintenance.flag')) {
 	header('Access-Control-Allow-Origin: *');
 	header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');

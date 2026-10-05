@@ -4,12 +4,6 @@ namespace greeny\SatisfactoryTools\Api\Model\Services;
 
 use JsonException;
 
-/**
- * Runs the external world-data-generator CLI (see world-data.md) for a given seed and
- * randomization settings, and aggregates its per-node output into resource-node counts
- * grouped by resource type and purity. Locations and node names are discarded — only the
- * counts (used by the frontend to derive resource limits) are returned.
- */
 class WorldDataService
 {
 
@@ -21,7 +15,6 @@ class WorldDataService
 
 	public const DEFAULT_PURITY = 'no-change';
 
-	/** Node purity buckets, in ascending order — every count group is reported with all three. */
 	private const PURITIES = ['impure', 'normal', 'pure'];
 
 	public function __construct(
@@ -33,12 +26,7 @@ class WorldDataService
 	{
 	}
 
-	/**
-	 * Generates world data for the given settings and returns the aggregated node counts.
-	 *
-	 * @throws WorldDataException on invalid settings, misconfiguration, or generator failure
-	 * @return array<string, mixed>
-	 */
+	/** @return array<string, mixed> */
 	public function generate(int $seed, string $mode = self::DEFAULT_MODE, string $purity = self::DEFAULT_PURITY): array
 	{
 		if (!in_array($mode, self::MODES, true)) {
@@ -57,9 +45,7 @@ class WorldDataService
 			throw new WorldDataException('World data file not found');
 		}
 
-		// The generator is deterministic for a given (seed, mode, purity), so results are
-		// cached on disk. The endpoint is open to anonymous users; the per-key lock also
-		// prevents a thundering herd from running the (expensive) binary in parallel.
+		// Results are deterministic per (seed, mode, purity), so they are cached on disk; the endpoint is open to anonymous users, so the per-key lock also prevents a thundering herd from running the expensive binary in parallel.
 		if ($this->cacheDir === '') {
 			return $this->generateUncached($seed, $mode, $purity);
 		}
@@ -156,10 +142,7 @@ class WorldDataService
 	}
 
 	/**
-	 * Runs the CLI with an argv array (no shell, so arguments cannot be injected) and
-	 * returns the decoded JSON, draining both pipes to avoid a full-buffer deadlock and
-	 * enforcing a wall-clock timeout.
-	 *
+	 * No shell, so arguments cannot be injected; both pipes are drained to avoid a full-buffer deadlock.
 	 * @param list<string> $command
 	 * @return array<string, mixed>
 	 */
@@ -213,7 +196,6 @@ class WorldDataService
 			}
 		}
 
-		// Drain whatever the process buffered right before it exited.
 		foreach ([1, 2] as $i) {
 			while (($chunk = fread($pipes[$i], 8192)) !== false && $chunk !== '') {
 				if ($i === 1) {
@@ -248,10 +230,7 @@ class WorldDataService
 	}
 
 	/**
-	 * Collapses the raw node list into counts by resource type and purity, dropping
-	 * locations and names. Geysers have no resource (grouped by purity only); fracking
-	 * cores carry a resource and a set of satellites whose purities are what get counted.
-	 *
+	 * Geysers have no resource (grouped by purity only); fracking cores carry a resource and satellites whose purities are what get counted.
 	 * @param array<string, mixed> $raw
 	 * @return array<string, mixed>
 	 */
@@ -308,8 +287,6 @@ class WorldDataService
 	}
 
 	/**
-	 * Normalizes a purity=>count map so every bucket (impure/normal/pure) is present.
-	 *
 	 * @param array<string, int> $counts
 	 * @return array<string, int>
 	 */

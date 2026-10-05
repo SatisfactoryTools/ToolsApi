@@ -5,11 +5,7 @@ namespace greeny\SatisfactoryTools\Api\Model\Entities;
 use Doctrine\ORM\Mapping as ORM;
 use greeny\SatisfactoryTools\Api\Model\Entities\Attributes\Identifier;
 
-/**
- * A mod version included in a custom version, with its application order. Merge order
- * matters (later mods overwrite earlier ones), so the plain many-to-many join table is
- * not enough — this entity carries the explicit position.
- */
+/** Explicit join entity because merge order matters (later mods overwrite earlier ones). */
 #[ORM\Entity]
 #[ORM\Table(name: 'version_mod_version')]
 class VersionModVersion
@@ -25,7 +21,6 @@ class VersionModVersion
 	#[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
 	public ModVersion $modVersion;
 
-	/** Zero-based application order; mods are merged in ascending position. */
 	#[ORM\Column]
 	public int $position = 0;
 

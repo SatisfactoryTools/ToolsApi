@@ -250,8 +250,7 @@ class FoldersController extends BaseV1Controller
 
 	private function getVersion(ApiRequest $request): ?Version
 	{
-		// Any version is addressable by UUID (the UUID acts as a capability); the folders
-		// themselves are still scoped to the user.
+		// Any version is addressable by UUID (the UUID acts as a capability); the folders themselves are still scoped to the user.
 		return $this->versionRepository->getByUuid(
 			(string) $this->getUuidParameter($request, 'version'),
 		);

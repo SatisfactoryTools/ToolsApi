@@ -24,19 +24,13 @@ use greeny\SatisfactoryTools\Api\Schema\Responses\HelpImageResponse;
 use Nette\Http\IResponse;
 use Ramsey\Uuid\Uuid;
 
-/**
- * Help articles (tutorials). Readers normally never reach this controller - they load the
- * static snapshot under data/help/ that HelpSnapshotService writes after every change;
- * the two public endpoints here serve the same JSON as a fallback. Everything under
- * /help/editor requires an account with the helpEditor flag.
- */
+/** Readers normally load the static snapshot HelpSnapshotService writes after every change; the public endpoints here are only a fallback. */
 #[Path('/help')]
 class HelpController extends BaseV1Controller
 {
 
 	private const SLUG_PATTERN = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 
-	/** Dot-separated, e.g. planner.overclocking - what a <help-button> in the app names. */
 	private const TOPIC_PATTERN = '/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/';
 
 	public function __construct(
@@ -257,8 +251,7 @@ class HelpController extends BaseV1Controller
 			return $this->notFound($response, 'Category not found');
 		}
 
-		// Articles survive their category (the join column is SET NULL) and show up
-		// under "Other" until they are moved somewhere else.
+		// Articles survive (join column is SET NULL) and show up under "Other".
 		$this->categoryRepository->delete($category);
 		$this->snapshotService->rebuild();
 
@@ -279,11 +272,6 @@ class HelpController extends BaseV1Controller
 		));
 	}
 
-	/**
-	 * Uploads a screenshot. The body is JSON - {fileName, data} with data base64-encoded
-	 * (optionally as a data: URL) - so the editor can post a pasted or dropped file the
-	 * same way it posts everything else.
-	 */
 	#[Path('/editor/images')]
 	#[Method('POST')]
 	public function uploadImage(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -343,7 +331,7 @@ class HelpController extends BaseV1Controller
 		return $response->withStatus(IResponse::S204_NoContent);
 	}
 
-	/** Rebuilds the static snapshot by hand - after editing the database directly, say. */
+	/** Manual rebuild, e.g. after editing the database directly. */
 	#[Path('/editor/publish')]
 	#[Method('POST')]
 	public function publish(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -358,10 +346,7 @@ class HelpController extends BaseV1Controller
 	}
 
 	/**
-	 * Applies a request body to an article. Returns null on success, or a callable that
-	 * writes the error response - validation failures are many and each needs its own
-	 * message, and this way both create and update report them identically.
-	 *
+	 * Returns a callable writing the error response so create and update report errors identically.
 	 * @param array<string, mixed> $body
 	 * @return (callable(ApiResponse): ApiResponse)|null
 	 */
@@ -415,8 +400,7 @@ class HelpController extends BaseV1Controller
 			if ($seeAlso === null) {
 				return fn (ApiResponse $response): ApiResponse => $this->badRequest($response, 'Field seeAlso must be a list of article slugs');
 			}
-			// Unknown or unpublished slugs are allowed: an article may point at one that
-			// is still being written, and the reader skips whatever is not in the manifest.
+			// Unknown slugs are allowed: the target may still be in progress, and the reader skips whatever is not in the manifest.
 			$article->seeAlso = $seeAlso;
 		}
 
@@ -498,10 +482,7 @@ class HelpController extends BaseV1Controller
 	}
 
 	/**
-	 * The first topic id already claimed by a different article, or null when they are
-	 * all free. A topic resolves to exactly one article, or a question-mark button would
-	 * not know where to go.
-	 *
+	 * A topic must resolve to exactly one article, or a help button would not know where to go.
 	 * @param array<string, string> $topics
 	 */
 	private function claimedTopic(array $topics, HelpArticle $article): ?string
@@ -520,9 +501,7 @@ class HelpController extends BaseV1Controller
 		return null;
 	}
 
-	/**
-	 * @return string[]|null null when the value is not a list of non-empty strings
-	 */
+	/** @return string[]|null */
 	private function stringList(mixed $value): ?array
 	{
 		if (!is_array($value)) {
@@ -543,10 +522,7 @@ class HelpController extends BaseV1Controller
 		return array_values(array_unique($list));
 	}
 
-	/**
-	 * @return array<string, string>|null topic id => anchor (without the '#'), or null
-	 *   when the value is not a valid topic map
-	 */
+	/** @return array<string, string>|null topic id => anchor (without '#') */
 	private function topicMap(mixed $value): ?array
 	{
 		if (!is_array($value)) {
@@ -564,7 +540,6 @@ class HelpController extends BaseV1Controller
 		return $topics;
 	}
 
-	/** The signed-in user, but only when they may edit help articles. */
 	private function requireEditor(ApiRequest $request): ?User
 	{
 		/** @var User|null $user */

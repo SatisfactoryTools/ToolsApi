@@ -5,23 +5,14 @@ namespace greeny\SatisfactoryTools\Api\Model\Services;
 use JsonException;
 use RuntimeException;
 
-/**
- * Builds the data file for a custom version: it starts from a base version's data file,
- * merges in any mod data files, and applies the custom multipliers (recipe cost, power
- * cost) to the resulting data.
- */
 class CustomVersionDataGenerator
 {
 
 	private const FLUID_FORMS = ['liquid', 'gas'];
 
-	/**
-	 * Recipes produced in any of these buildings are exempt from the recipe cost
-	 * multiplier: packaging/unpackaging must stay 1:1 or the fluid loop breaks.
-	 */
+	/** Packaging/unpackaging must stay 1:1 or the fluid loop breaks. */
 	private const RECIPE_COST_EXEMPT_BUILDINGS = ['Desc_Packager_C'];
 
-	/** Individual recipes exempt from the recipe cost multiplier. */
 	private const RECIPE_COST_EXEMPT_RECIPES = ['Recipe_Alternate_DilutedPackagedFuel_C'];
 
 	public function __construct(
@@ -31,13 +22,9 @@ class CustomVersionDataGenerator
 	}
 
 	/**
-	 * Reads the base data file, merges the mod data files (in order), applies the
-	 * multipliers and writes the result to $targetRelativePath. All paths are
-	 * web-root-relative, matching Version::$dataPath / ModVersion::$dataPath.
-	 *
-	 * @param string[] $modDataPaths mod data files to merge, in application order
-	 * @param array<string, mixed>|null $worldData resource-node counts and derived limits to
-	 *   record under metadata.world (null to leave the base metadata untouched)
+	 * All paths are web-root-relative, matching Version::$dataPath / ModVersion::$dataPath.
+	 * @param string[] $modDataPaths in application order
+	 * @param array<string, mixed>|null $worldData recorded under metadata.world; null leaves the base metadata untouched
 	 */
 	public function generate(
 		string $baseRelativePath,
@@ -73,12 +60,6 @@ class CustomVersionDataGenerator
 	}
 
 	/**
-	 * Merges a mod's data into the base data. Within each data category (recipes, items,
-	 * buildings, …) entries are keyed by class name: a mod entry overwrites the base entry
-	 * with the same class name and adds entries with new class names. Metadata is merged
-	 * shallowly. The multipliers are applied afterwards, so they also affect merged-in
-	 * recipes and buildings.
-	 *
 	 * @param array<string, mixed> $base
 	 * @param array<string, mixed> $mod
 	 */
@@ -102,12 +83,7 @@ class CustomVersionDataGenerator
 	}
 
 	/**
-	 * Increases the cost (ingredient amounts) of every recipe. Solid items use
-	 * max(1, round(abs(amount) * multiplier)); fluids (liquid/gas) are multiplied
-	 * directly, since they may carry decimal amounts. Recipes listed in
-	 * RECIPE_COST_EXEMPT_RECIPES or produced in a RECIPE_COST_EXEMPT_BUILDINGS building
-	 * (matched by class name) are left untouched.
-	 *
+	 * Fluid amounts may be decimal, so they are multiplied without rounding.
 	 * @param array<string, mixed> $data
 	 */
 	private function applyRecipeCost(array &$data, float $multiplier): void
@@ -132,9 +108,7 @@ class CustomVersionDataGenerator
 		unset($recipe);
 	}
 
-	/**
-	 * @param array<string, mixed> $recipe
-	 */
+	/** @param array<string, mixed> $recipe */
 	private function isRecipeCostExempt(string $className, array $recipe): bool
 	{
 		if (in_array($className, self::RECIPE_COST_EXEMPT_RECIPES, true)) {
@@ -149,12 +123,7 @@ class CustomVersionDataGenerator
 		return array_intersect($producedIn, self::RECIPE_COST_EXEMPT_BUILDINGS) !== [];
 	}
 
-	/**
-	 * Multiplies power consumption by the multiplier: every machine's (building's)
-	 * base power draw, plus the variable power draw of recipes that use it.
-	 *
-	 * @param array<string, mixed> $data
-	 */
+	/** @param array<string, mixed> $data */
 	private function applyPowerCost(array &$data, float $multiplier): void
 	{
 		foreach ($data['data']['buildings'] as &$building) {
@@ -173,7 +142,7 @@ class CustomVersionDataGenerator
 
 	/**
 	 * @param array<string, mixed> $data
-	 * @return array<string, true> set of item class names whose form is a fluid
+	 * @return array<string, true> set of fluid item class names
 	 */
 	private function fluidItemLookup(array $data): array
 	{
@@ -217,9 +186,7 @@ class CustomVersionDataGenerator
 			throw new RuntimeException('Could not encode generated version data', 0, $e);
 		}
 
-		// Write-then-rename so a crash mid-write can never leave a truncated file at the
-		// final path — readers (Apache serves these statically) see the old file or the
-		// complete new one, never a partial write.
+		// Write-then-rename so readers (Apache serves these statically) never see a truncated file.
 		$tmp = $absolute . '.tmp';
 		if (@file_put_contents($tmp, $json) === false || !@rename($tmp, $absolute)) {
 			@unlink($tmp);

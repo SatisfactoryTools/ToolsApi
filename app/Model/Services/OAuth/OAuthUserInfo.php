@@ -2,19 +2,14 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
-/**
- * What we read from a third-party provider: the stable account id, a verified email
- * (where available) used to match against existing users, and — display only — the
- * provider's nickname and avatar so the frontend can greet users who have no login of
- * their own choosing. Nickname and avatar are never used for matching.
- */
+/** Nickname and avatar are display only, never used for matching. */
 class OAuthUserInfo
 {
 
-	/** Longest nickname we store (OAuthIdentity::$nickname column width). */
+	/** OAuthIdentity::$nickname column width. */
 	public const NicknameMaxLength = 100;
 
-	/** Longest avatar URL we store (OAuthIdentity::$avatarUrl column width). */
+	/** OAuthIdentity::$avatarUrl column width. */
 	public const AvatarUrlMaxLength = 512;
 
 	public readonly ?string $nickname;
@@ -38,8 +33,6 @@ class OAuthUserInfo
 			return null;
 		}
 
-		// Providers return arbitrary user-typed text; strip control characters and
-		// surrounding whitespace, and cap to the column width.
 		$clean = trim((string) preg_replace('/[\p{C}]+/u', '', $nickname));
 		if ($clean === '') {
 			return null;
@@ -55,7 +48,6 @@ class OAuthUserInfo
 		}
 
 		$url = trim($url);
-		// Only https URLs are worth handing to a browser; anything else is dropped.
 		if ($url === '' || strlen($url) > self::AvatarUrlMaxLength || !str_starts_with($url, 'https://')) {
 			return null;
 		}

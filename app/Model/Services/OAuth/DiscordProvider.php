@@ -2,11 +2,6 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
-/**
- * Discord OAuth2. Scopes: `identify email`. We read the account id, verified email and,
- * for display, the global name (falling back to the username) and avatar.
- * @see https://discord.com/developers/docs/topics/oauth2
- */
 class DiscordProvider extends AbstractOAuthProvider
 {
 
@@ -71,8 +66,6 @@ class DiscordProvider extends AbstractOAuthProvider
 			$email = strtolower((string) $user['email']);
 		}
 
-		// `global_name` is the display name shown in Discord; legacy accounts without one
-		// fall back to the unique username.
 		$nickname = (string) ($user['global_name'] ?? '');
 		if ($nickname === '') {
 			$nickname = (string) ($user['username'] ?? '');

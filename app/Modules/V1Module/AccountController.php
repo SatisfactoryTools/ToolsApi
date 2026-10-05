@@ -12,16 +12,12 @@ use greeny\SatisfactoryTools\Api\Model\Repositories\UserRepository;
 use greeny\SatisfactoryTools\Api\Schema\Responses\Auth\ProfileResponse;
 use Nette\Http\IResponse;
 
-/**
- * The signed-in user's own account profile. Lives outside /v1/auth on purpose: it is
- * not part of the sign-in flow, so the frontend's regular auth interceptor (Bearer
- * header, token refresh) applies to it like to any other resource.
- */
+/** Lives outside /v1/auth on purpose so the frontend's regular auth interceptor (Bearer header, token refresh) applies to it. */
 #[Path('/account')]
 class AccountController extends BaseV1Controller
 {
 
-	/** Bounds for a user-chosen display name (also the column width). */
+	/** MAX also matches the column width. */
 	private const DISPLAY_NAME_MIN_LENGTH = 1;
 	private const DISPLAY_NAME_MAX_LENGTH = 50;
 
@@ -32,7 +28,6 @@ class AccountController extends BaseV1Controller
 	{
 	}
 
-	/** Returns the profile of the user identified by the access token. */
 	#[Path('/')]
 	#[Method('GET')]
 	public function get(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -46,12 +41,6 @@ class AccountController extends BaseV1Controller
 		return $response->writeJsonBody($this->profile($user));
 	}
 
-	/**
-	 * Sets or clears the user's display name. Body: { displayName: string|null } — a
-	 * string is trimmed and must be 1–50 characters (uniqueness is not required); null
-	 * or an empty string clears it so the resolution falls back to login / provider
-	 * nickname. Returns the updated profile.
-	 */
 	#[Path('/')]
 	#[Method('PUT')]
 	public function update(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -77,8 +66,7 @@ class AccountController extends BaseV1Controller
 
 		$displayName = null;
 		if ($raw !== null) {
-			// Collapse inner whitespace runs and drop control characters so the name
-			// renders the same everywhere it is shown.
+			// Collapse inner whitespace runs and drop control characters so the name renders the same everywhere.
 			$displayName = trim((string) preg_replace('/\s+/u', ' ', (string) preg_replace('/\p{C}+/u', '', $raw)));
 			if ($displayName === '') {
 				$displayName = null;

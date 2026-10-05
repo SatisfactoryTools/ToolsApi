@@ -9,21 +9,13 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-/**
- * Deletes generated custom version data files that have not been (re)generated recently.
- * The files are pure cache artifacts — the definitions live in the database and any
- * pruned file is re-materialized on demand via POST /v1/versions/{uuid}/data — so this
- * only reclaims disk. Intended to run from cron, e.g. daily:
- *
- *   0 4 * * * php /path/to/bin/console versions:prune
- */
+/** The files are pure cache (definitions live in the DB and pruned files are re-generated on demand via POST /v1/versions/{uuid}/data), so this only reclaims disk. Meant to run daily from cron. */
 #[AsCommand(name: 'versions:prune', description: 'Deletes generated custom version data files older than the retention period')]
 class PruneVersionFilesCommand extends Command
 {
 
 	private const CUSTOM_DIR = 'data/versions/custom';
 
-	/** Leftover atomic-write temp files older than this many seconds are also removed. */
 	private const TMP_MAX_AGE = 3600;
 
 	public function __construct(
@@ -72,8 +64,7 @@ class PruneVersionFilesCommand extends Command
 			}
 		}
 
-		// Crashed generations can leave *.tmp files behind; anything older than an hour
-		// is guaranteed dead (generation is bounded by the request lifetime).
+		// Crashed generations can leave *.tmp files behind; anything older than an hour is guaranteed dead (generation is bounded by the request lifetime).
 		foreach (glob($dir . '/*.tmp') ?: [] as $file) {
 			$mtime = @filemtime($file);
 			if ($mtime !== false && $mtime <= $now - self::TMP_MAX_AGE && !$dryRun) {

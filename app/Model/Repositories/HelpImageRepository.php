@@ -8,7 +8,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\HelpImage;
 class HelpImageRepository extends BaseRepository
 {
 
-	/** @return HelpImage[] newest first, for the editor's media list */
+	/** @return HelpImage[] newest first */
 	public function getAll(): array
 	{
 		return $this->getRepository()->findBy([], ['uploadedAt' => 'DESC']);

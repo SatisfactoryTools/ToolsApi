@@ -4,10 +4,7 @@ namespace greeny\SatisfactoryTools\Api\Schema\Responses;
 
 use greeny\SatisfactoryTools\Api\Model\Entities\HelpArticle;
 
-/**
- * An article as the editor sees it - drafts included, with everything needed to edit it.
- * Readers do not use this; they get the static snapshot files instead.
- */
+/** Editor view only - readers get the static snapshot files instead. */
 class HelpArticleResponse
 {
 
@@ -21,7 +18,6 @@ class HelpArticleResponse
 		public readonly string $slug,
 		public readonly string $title,
 		public readonly string $summary,
-		/** Null in list responses, where bodies would only be dead weight. */
 		public readonly ?string $body,
 		public readonly array $keywords,
 		public readonly object $topics,

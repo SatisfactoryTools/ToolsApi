@@ -35,22 +35,14 @@ class Plan
 	#[ORM\Column]
 	public DateTimeImmutable $createdAt;
 
-	/**
-	 * Last content/move change. Null for plans that predate this column — treat null as
-	 * createdAt (see getUpdatedAt()).
-	 */
+	/** Null for plans that predate this column; use getUpdatedAt(). */
 	#[ORM\Column(nullable: true)]
 	public ?DateTimeImmutable $updatedAt = null;
 
 	#[ORM\Column]
 	public int $revision = 0;
 
-	/**
-	 * Whether anyone holding the plan's own URL may open it read-only (GET /v1/plans/{uuid}).
-	 * Defaults to true, for plans created before the column existed as well: a plan URL is
-	 * an unguessable UUID, and people hand it out expecting the recipient to see the plan.
-	 * The owner turns it off per plan in the share dialog.
-	 */
+	/** Defaults to true (also for older plans): plan URLs are unguessable UUIDs and people hand them out expecting the recipient to see the plan. */
 	#[ORM\Column(options: ['default' => true])]
 	public bool $linkAccess = true;
 

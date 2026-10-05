@@ -11,11 +11,6 @@ use Apitte\Core\Schema\EndpointParameter;
 use greeny\SatisfactoryTools\Api\Model\Services\PlanLinkService;
 use Nette\Http\IResponse;
 
-/**
- * The plan behind a plan URL, for anyone holding that URL. Separate from the
- * version-scoped, owner-only PlansController: this one is public and read-only, and the
- * plan UUID alone addresses it — the frontend's planner URL carries nothing else.
- */
 #[Path('/plans')]
 class PublicPlansController extends BaseV1Controller
 {
@@ -24,11 +19,7 @@ class PublicPlansController extends BaseV1Controller
 	{
 	}
 
-	/**
-	 * Loads a plan (and its subplans) live for read-only viewing. No authentication: the
-	 * UUID is the capability. 404 covers both "no such plan" and "the owner turned link
-	 * access off", so the endpoint never confirms that a private plan exists.
-	 */
+	/** No authentication, the UUID is the capability. 404 covers both "no such plan" and "link access off", so a private plan's existence is never confirmed. */
 	#[Path('/{uuid}')]
 	#[Method('GET')]
 	#[RequestParameter(name: 'uuid', type: 'string', in: EndpointParameter::IN_PATH)]

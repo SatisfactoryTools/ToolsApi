@@ -32,8 +32,7 @@ class AuthService
 
 	public function register(string $login, string $email, string $password): User
 	{
-		// Emails are matched case-insensitively (and OAuth providers hand us lowercased
-		// addresses), so normalize before storing and comparing to keep accounts unique.
+		// OAuth providers hand us lowercased addresses, so normalize to keep accounts unique.
 		$email = strtolower($email);
 
 		if ($this->userRepository->getByLogin($login) !== null) {
@@ -75,7 +74,6 @@ class AuthService
 
 		$user = $refreshToken->user;
 
-		// Rotate: invalidate old refresh token before issuing new one
 		$this->refreshTokenRepository->delete($refreshToken);
 
 		return $this->issueTokens($user);
@@ -124,9 +122,6 @@ class AuthService
 		// TODO: dispatch email with reset link containing $resetToken->token
 	}
 
-	/**
-	 * @throws AuthException
-	 */
 	public function resetPassword(string $tokenValue, string $newPassword): void
 	{
 		$resetToken = $this->passwordResetTokenRepository->getByToken($tokenValue);
@@ -145,17 +140,11 @@ class AuthService
 		$this->userRepository->save($resetToken->user, flush: false);
 		$this->passwordResetTokenRepository->save($resetToken);
 
-		// Resetting the password invalidates every existing session: if the account was
-		// compromised, this logs the attacker out everywhere.
+		// If the account was compromised, this logs the attacker out everywhere.
 		$this->refreshTokenRepository->deleteAllForUser($resetToken->user);
 	}
 
-	/**
-	 * Issue a fresh access/refresh token pair for a user. Used by the OAuth flow after a
-	 * successful third-party login or signup.
-	 *
-	 * @return array{accessToken: string, refreshToken: string, expiresIn: int}
-	 */
+	/** @return array{accessToken: string, refreshToken: string, expiresIn: int} */
 	public function issueTokensForUser(User $user): array
 	{
 		return $this->issueTokens($user);

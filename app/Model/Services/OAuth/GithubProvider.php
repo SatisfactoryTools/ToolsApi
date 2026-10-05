@@ -2,12 +2,7 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
-/**
- * GitHub OAuth2. Scopes: `read:user user:email`. We read the numeric account id, the
- * primary verified email (GitHub may hide the email on the profile, so we query the
- * dedicated emails endpoint) and, for display, the GitHub login and avatar.
- * @see https://docs.github.com/en/apps/oauth-apps/building-oauth-apps
- */
+/** GitHub may hide the email on the profile, so it's read from the dedicated emails endpoint. */
 class GithubProvider extends AbstractOAuthProvider
 {
 

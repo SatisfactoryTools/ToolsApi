@@ -2,21 +2,12 @@
 
 namespace greeny\SatisfactoryTools\Api\Utils;
 
-/**
- * Pulls the headings out of an article's Markdown so the manifest can carry a table of
- * contents (and so the editor can offer anchors for the question-mark buttons) without
- * anyone parsing article bodies up front.
- *
- * The anchor algorithm is mirrored by HelpMarkdownRenderer in the frontend - the ids it
- * puts on rendered headings must match the ones listed here, or deep links break.
- */
+/** The anchor algorithm is mirrored by HelpMarkdownRenderer in the frontend - ids must match, or deep links break. */
 class MarkdownSections
 {
 
 	/**
-	 * Level 2 and 3 headings, in document order. Level 1 is the article title, which the
-	 * reader renders itself.
-	 *
+	 * Level 1 is skipped, it's the article title which the reader renders itself.
 	 * @return array<int, array{id: string, title: string, level: int}>
 	 */
 	public static function extract(string $markdown): array
@@ -52,7 +43,6 @@ class MarkdownSections
 		return $sections;
 	}
 
-	/** Lowercased, spaces to dashes, everything else dropped. */
 	public static function anchor(string $title): string
 	{
 		$anchor = strtolower($title);
@@ -60,11 +50,10 @@ class MarkdownSections
 		return trim($anchor, '-');
 	}
 
-	/** Strips the inline Markdown a heading may contain, leaving the visible text. */
 	private static function plainText(string $title): string
 	{
-		$title = preg_replace('/!?\[([^\]]*)\]\([^)]*\)/', '$1', $title) ?? $title; // links, images
-		$title = preg_replace('/[*_`]+/', '', $title) ?? $title; // emphasis, code
+		$title = preg_replace('/!?\[([^\]]*)\]\([^)]*\)/', '$1', $title) ?? $title;
+		$title = preg_replace('/[*_`]+/', '', $title) ?? $title;
 		return trim($title);
 	}
 

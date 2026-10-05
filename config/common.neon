@@ -1,6 +1,5 @@
 parameters:
-	# Optional secrets default to empty so existing local.neon files keep working; set
-	# them in local.neon to enable the feature.
+	# Optional secrets default to empty so existing local.neon files keep working.
 	oauthSteamApiKey: ''
 
 	jwt:
@@ -8,16 +7,13 @@ parameters:
 		accessTokenTtl: 3600      # 1 hour
 		refreshTokenTtl: 2592000  # 30 days
 	worldData:
-		# External world-data-generator CLI (see world-data.md) and its default-world.json.
 		generatorBin: %worldDataGeneratorBin%
 		worldFile: %worldDataWorldFile%
-		timeout: 60               # seconds before a generation run is aborted
+		timeout: 60               # seconds
 
 	oauth:
-		# Base URL of the frontend callback page. The per-provider redirect URI is this
-		# plus "/{provider}", e.g. https://tools.example.com/auth/callback/discord
 		callbackBaseUrl: %oauthCallbackBaseUrl%
-		stateTtl: 600             # 10 minutes for an in-flight authorization
+		stateTtl: 600             # 10 minutes
 		discord:
 			clientId: %oauthDiscordClientId%
 			clientSecret: %oauthDiscordClientSecret%
@@ -28,9 +24,7 @@ parameters:
 			clientId: %oauthGoogleClientId%
 			clientSecret: %oauthGoogleClientSecret%
 		steam:
-			# Steam needs no client credentials for sign-in (OpenID 2.0 only returns a Steam
-			# ID). The Web API key is optional and only used to read the persona name and
-			# avatar for display; leave empty to skip that.
+			# Optional, only used to read the persona name and avatar for display (sign-in needs no credentials).
 			apiKey: %oauthSteamApiKey%
 
 php:

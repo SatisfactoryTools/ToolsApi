@@ -13,37 +13,18 @@ use greeny\SatisfactoryTools\Api\Model\Repositories\ShareRepository;
 use JsonException;
 use Ramsey\Uuid\Uuid;
 
-/**
- * Creates and reads point-in-time shares. Sharing a folder or plan freezes the entire
- * subtree beneath it (descendant folders, their plans, and all nested subplans) into a
- * JSON snapshot on the Share row, so subsequent edits to the originals are never visible
- * to anyone who already holds the share link.
- *
- * The tree is either read from the creator's own rows (shareFolder()/sharePlan()) or
- * taken from the request (shareTree(), for plans that only exist in the browser). Both
- * produce the same snapshot; only the latter needs validating, since it is reachable
- * without an account.
- */
+/** Shares freeze the whole subtree into a JSON snapshot, so later edits to the originals never reach link holders. Only shareTree() input needs validating, since it is reachable without an account. */
 class ShareService
 {
 
-	/**
-	 * Maximum entries in a user's visited-shares list; inserting beyond it evicts the
-	 * entry with the oldest visitedAt. The frontend mirrors this value for the anonymous
-	 * localStorage list, so keep the two in sync (docs/shared-plans-api.md).
-	 */
+	/** The frontend mirrors this for the anonymous localStorage list; keep the two in sync. */
 	public const VISITED_CAP = 20;
 
-	/**
-	 * Caps on a tree sent with the request (shareTree(), reached by the unauthenticated
-	 * POST /v1/shares). The raw body is capped separately by the controller; these bound
-	 * the shape of the tree, so a body that fits cannot still expand into an expensive
-	 * structure or an unreasonable number of rows in the viewer.
-	 */
+	/** Bound the tree shape for the unauthenticated POST /v1/shares; the raw body size is capped separately by the controller. */
 	public const TREE_MAX_NODES = 500;
 	public const TREE_MAX_DEPTH = 32;
 
-	/** Cap on a node name, matching the column owned folders/plans are stored in. */
+	/** Matches the column length of owned folders/plans. */
 	private const NAME_MAX_LENGTH = 255;
 
 	public function __construct(
@@ -54,7 +35,6 @@ class ShareService
 	{
 	}
 
-	/** Freezes a folder and everything under it into a new share. */
 	public function shareFolder(User $user, Version $version, Folder $folder): Share
 	{
 		$index = $this->treeBuilder->index($user, $version);
@@ -62,7 +42,6 @@ class ShareService
 		return $this->persist($user, 'folder', $version, $this->treeBuilder->folderNode($folder, $index));
 	}
 
-	/** Freezes a plan (or subplan) and all of its subplans into a new share. */
 	public function sharePlan(User $user, Version $version, Plan $plan): Share
 	{
 		$index = $this->treeBuilder->index($user, $version);
@@ -70,21 +49,7 @@ class ShareService
 		return $this->persist($user, 'plan', $version, $this->treeBuilder->planNode($plan, $index));
 	}
 
-	/**
-	 * Freezes a tree the client sent with the request, reading nothing from the folder and
-	 * plan tables. This is how a signed-out visitor shares — their plans live only in the
-	 * browser, so there is no row to point at — and how a signed-in one shares the plans
-	 * they still keep on the device. $user is the creator when the request carried a token
-	 * and null otherwise; the resulting share is identical either way.
-	 *
-	 * The node shape mirrors what GET /v1/shares/{uuid} returns: a plan is
-	 * {id?, name, description?, data, subplans[]}, a folder {id?, name, data, children[],
-	 * plans[]}. Node ids are optional — they are only internal references, and a copy of a
-	 * share mints fresh ones anyway — so missing ones are generated here. createdAt is
-	 * server-assigned.
-	 *
-	 * @throws ShareInputException when the tree is malformed or busts one of the caps
-	 */
+	/** Freezes a client-sent tree (plans that live only in the browser). Node shape mirrors GET /v1/shares/{uuid}; node ids are optional and generated when missing. */
 	public function shareTree(?User $user, Version $version, string $type, mixed $root): Share
 	{
 		$createdAt = new DateTimeImmutable();
@@ -97,12 +62,7 @@ class ShareService
 		return $this->persist($user, $type, $version, $node, $createdAt);
 	}
 
-	/**
-	 * Returns the frozen contents of a share for the read-only viewer, or null if the
-	 * UUID is malformed or no such share exists.
-	 *
-	 * @return array<string, mixed>|null
-	 */
+	/** @return array<string, mixed>|null */
 	public function present(string $shareUuid): ?array
 	{
 		if (!Uuid::isValid($shareUuid)) {
@@ -126,13 +86,7 @@ class ShareService
 		];
 	}
 
-	/**
-	 * The user's visited shares, most recently visited first, as the response payload of
-	 * GET /v1/shares/visited. Everything except visitedAt is resolved from the frozen
-	 * share at read time (shares are immutable, so the values are stable).
-	 *
-	 * @return array{shares: array<int, array<string, mixed>>}
-	 */
+	/** @return array{shares: array<int, array<string, mixed>>} */
 	public function visitedShares(User $user): array
 	{
 		$shares = [];
@@ -159,12 +113,7 @@ class ShareService
 		return ['shares' => $shares];
 	}
 
-	/**
-	 * The icon the planner shows for a plan, read from the plan's frozen `data` JSON so
-	 * the visited list can carry it without the frontend fetching every share. Mirrors
-	 * the frontend's own rule: an explicit `iconClassName` key wins (a null there means
-	 * "no icon" and stays null), otherwise the item of the first request, otherwise null.
-	 */
+	/** Mirrors the frontend's icon rule (an explicit null iconClassName means no icon), so the visited list can carry icons without fetching every share. */
 	private function resolvePlanIcon(mixed $data): ?string
 	{
 		if (!is_string($data)) {
@@ -188,10 +137,6 @@ class ShareService
 		return null;
 	}
 
-	/**
-	 * Records a visit of the share by the user (upsert — an existing entry only gets its
-	 * visitedAt bumped). Returns false if no such share exists.
-	 */
 	public function recordVisit(User $user, string $shareUuid): bool
 	{
 		$share = Uuid::isValid($shareUuid) ? $this->shareRepository->getByUuid($shareUuid) : null;
@@ -204,10 +149,6 @@ class ShareService
 		return true;
 	}
 
-	/**
-	 * Removes the user's visit entry for the share, if any. Idempotent; never touches the
-	 * share itself.
-	 */
 	public function forgetVisit(User $user, string $shareUuid): void
 	{
 		$share = Uuid::isValid($shareUuid) ? $this->shareRepository->getByUuid($shareUuid) : null;
@@ -246,14 +187,7 @@ class ShareService
 		return $share;
 	}
 
-	/**
-	 * Validates one node of a client-sent tree and returns the fields every node shares
-	 * (plus the node itself, for the caller to read its children from). $path — e.g.
-	 * "root.plans[2].subplans[0]" — makes a rejection point at the offending node.
-	 *
-	 * @return array{input: array<string, mixed>, id: string, name: string, data: string}
-	 * @throws ShareInputException
-	 */
+	/** @return array{input: array<string, mixed>, id: string, name: string, data: string} */
 	private function readNode(mixed $input, string $path, int $depth): array
 	{
 		if (!is_array($input) || (array_is_list($input) && $input !== [])) {
@@ -283,8 +217,7 @@ class ShareService
 			throw new ShareInputException(sprintf('Field %s.name may be at most %d characters long', $path, self::NAME_MAX_LENGTH));
 		}
 
-		// The same opaque JSON string the frontend PUTs for an owned plan/folder; stored
-		// verbatim, exactly like the owned path stores $plan->data.
+		// Opaque JSON string stored verbatim, exactly like the owned path stores $plan->data.
 		$data = $input['data'] ?? '{}';
 		if (!is_string($data)) {
 			throw new ShareInputException(sprintf('Field %s.data must be a JSON string', $path));
@@ -296,7 +229,6 @@ class ShareService
 	/**
 	 * @param array<string, mixed> $input
 	 * @return array<int, mixed>
-	 * @throws ShareInputException
 	 */
 	private function readChildList(array $input, string $key, string $path): array
 	{
@@ -312,11 +244,7 @@ class ShareService
 		return $list;
 	}
 
-	/**
-	 * @param int $nodes running total of nodes read so far
-	 * @return array<string, mixed>
-	 * @throws ShareInputException
-	 */
+	/** @return array<string, mixed> */
 	private function readPlanNode(mixed $input, string $path, int $depth, int &$nodes, DateTimeImmutable $createdAt): array
 	{
 		$node = $this->readNode($input, $path, $depth);
@@ -342,11 +270,7 @@ class ShareService
 		];
 	}
 
-	/**
-	 * @param int $nodes running total of nodes read so far
-	 * @return array<string, mixed>
-	 * @throws ShareInputException
-	 */
+	/** @return array<string, mixed> */
 	private function readFolderNode(mixed $input, string $path, int $depth, int &$nodes, DateTimeImmutable $createdAt): array
 	{
 		$node = $this->readNode($input, $path, $depth);
@@ -372,7 +296,6 @@ class ShareService
 		];
 	}
 
-	/** @throws ShareInputException */
 	private function countNode(int &$nodes): void
 	{
 		if (++$nodes > self::TREE_MAX_NODES) {

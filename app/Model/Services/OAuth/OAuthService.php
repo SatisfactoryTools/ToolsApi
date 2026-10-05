@@ -38,12 +38,7 @@ class OAuthService
 		return $this->registry->has($providerKey);
 	}
 
-	/**
-	 * Begin an authorization flow. When $linkUser is set the flow links the provider to
-	 * that already-authenticated user rather than logging in / signing up.
-	 *
-	 * @return array{authorizationUrl: string, state: string}
-	 */
+	/** @return array{authorizationUrl: string, state: string} */
 	public function start(string $providerKey, ?User $linkUser = null): array
 	{
 		$provider = $this->registry->get($providerKey);
@@ -63,12 +58,7 @@ class OAuthService
 		];
 	}
 
-	/**
-	 * Validate the provider callback and either authenticate (login/signup) or link.
-	 *
-	 * @param array<string, mixed> $params the query parameters the provider sent to the callback
-	 * @throws OAuthException
-	 */
+	/** @param array<string, mixed> $params */
 	public function handleCallback(string $providerKey, array $params): OAuthCallbackResult
 	{
 		$provider = $this->registry->get($providerKey);
@@ -97,15 +87,12 @@ class OAuthService
 			: $this->loginOrSignup($providerKey, $info);
 	}
 
-	/**
-	 * @return list<array{provider: string, email: string|null, nickname: string|null, avatarUrl: string|null, connectedAt: string, canDisconnect: bool}>
-	 */
+	/** @return list<array{provider: string, email: string|null, nickname: string|null, avatarUrl: string|null, connectedAt: string, canDisconnect: bool}> */
 	public function listConnections(User $user): array
 	{
 		$identities = $this->identityRepository->findAllForUser($user);
 
-		// A password-less account must keep at least one connection, so its single remaining
-		// connection is not removable. With a password (or 2+ connections) any can be removed.
+		// A password-less account must keep at least one connection, so its single remaining connection is not removable.
 		$removable = $user->passwordHash !== null || count($identities) > 1;
 
 		$result = [];
@@ -123,7 +110,6 @@ class OAuthService
 		return $result;
 	}
 
-	/** @throws OAuthException */
 	public function unlink(User $user, string $providerKey): void
 	{
 		if (!$this->registry->has($providerKey)) {
@@ -135,8 +121,6 @@ class OAuthService
 			throw new OAuthException('No ' . $providerKey . ' connection to remove');
 		}
 
-		// Guard against locking the user out: a password-less account must keep at least
-		// one provider connection.
 		if ($user->passwordHash === null && $this->identityRepository->countForUser($user) <= 1) {
 			throw new OAuthException('Cannot remove your only sign-in method. Set a password first.');
 		}
@@ -144,7 +128,6 @@ class OAuthService
 		$this->identityRepository->delete($identity);
 	}
 
-	/** @throws OAuthException */
 	private function link(User $user, string $providerKey, OAuthUserInfo $info): OAuthCallbackResult
 	{
 		$existing = $this->identityRepository->getByProviderAccount($providerKey, $info->providerUserId);
@@ -166,7 +149,6 @@ class OAuthService
 		return OAuthCallbackResult::linkedTo($user, $providerKey);
 	}
 
-	/** @throws OAuthException */
 	private function loginOrSignup(string $providerKey, OAuthUserInfo $info): OAuthCallbackResult
 	{
 		$identity = $this->identityRepository->getByProviderAccount($providerKey, $info->providerUserId);
@@ -214,11 +196,7 @@ class OAuthService
 		return $identity;
 	}
 
-	/**
-	 * Keeps the stored nickname/avatar in step with the provider on every sign-in through
-	 * it. A provider that reports nothing this time (e.g. Steam without an API key) keeps
-	 * whatever was stored before rather than wiping it.
-	 */
+	/** A provider reporting nothing this time (e.g. Steam without an API key) keeps the stored nickname/avatar rather than wiping it. */
 	private function refreshProfile(OAuthIdentity $identity, OAuthUserInfo $info): void
 	{
 		$changed = false;

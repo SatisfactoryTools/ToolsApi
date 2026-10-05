@@ -4,10 +4,6 @@ namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
 
-/**
- * Outcome of a callback: either the user was authenticated (login/signup, tokens issued)
- * or an already-authenticated user linked a new provider (no tokens).
- */
 class OAuthCallbackResult
 {
 

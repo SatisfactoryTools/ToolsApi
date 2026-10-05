@@ -25,17 +25,11 @@ class User
 	#[ORM\Column(length: 255, nullable: true)]
 	public ?string $passwordHash = null;
 
-	/**
-	 * Name the user chose to be shown as (navbar, greetings). Optional; when unset the
-	 * frontend falls back to the login or a provider nickname — see AccountController.
-	 */
+	/** When unset, the frontend falls back to the login or a provider nickname. */
 	#[ORM\Column(length: 50, nullable: true)]
 	public ?string $displayName = null;
 
-	/**
-	 * May create and edit help articles. Set by hand in the database; there is no role
-	 * system and no way to grant it through the API.
-	 */
+	/** Set by hand in the database; there is no role system or API to grant it. */
 	#[ORM\Column]
 	public bool $helpEditor = false;
 

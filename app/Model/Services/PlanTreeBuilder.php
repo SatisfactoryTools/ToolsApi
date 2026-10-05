@@ -9,12 +9,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use greeny\SatisfactoryTools\Api\Model\Repositories\FolderRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
 
-/**
- * Reads a user's folder/plan subtree out of the database into the node shape every
- * read-only view of a tree uses: ShareService freezes it into a share snapshot, and
- * PlanLinkService serves it live for a plan opened by its own URL. Both produce the
- * same JSON, so the viewer in the frontend only ever sees one shape.
- */
+/** Builds the single node shape shared by ShareService (frozen snapshots) and PlanLinkService (live view), so the frontend viewer only ever sees one shape. */
 class PlanTreeBuilder
 {
 
@@ -25,12 +20,7 @@ class PlanTreeBuilder
 	{
 	}
 
-	/**
-	 * Loads every folder and plan the user owns in this version once, and indexes them by
-	 * parent so a tree can be walked without further queries.
-	 *
-	 * @return array{childFolders: array<int, Folder[]>, folderPlans: array<int, Plan[]>, subplans: array<int, Plan[]>}
-	 */
+	/** @return array{childFolders: array<int, Folder[]>, folderPlans: array<int, Plan[]>, subplans: array<int, Plan[]>} */
 	public function index(User $user, Version $version): array
 	{
 		$childFolders = [];
@@ -101,10 +91,7 @@ class PlanTreeBuilder
 	}
 
 	/**
-	 * The version identity travelling with a shared or linked tree. It carries no data
-	 * path — the viewer resolves the version by id (GET /v1/versions/{uuid} for one it
-	 * does not have yet).
-	 *
+	 * Carries no data path; the viewer resolves the version by id.
 	 * @return array<string, mixed>
 	 */
 	public function versionSnapshot(Version $version): array

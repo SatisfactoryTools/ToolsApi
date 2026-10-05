@@ -23,9 +23,7 @@ abstract class BaseController implements IController
 	}
 
 	/**
-	 * parseBody() for callers that already hold the raw body (e.g. to measure it before
-	 * decoding) — the request stream is only worth reading once.
-	 *
+	 * For callers that already hold the raw body (e.g. to measure it before decoding), since the request stream is only worth reading once.
 	 * @return array<string, mixed>
 	 */
 	protected function parseBodyString(string $body): array
@@ -39,8 +37,7 @@ abstract class BaseController implements IController
 			return [];
 		}
 
-		// A valid JSON scalar (e.g. `5`, `true`, `"x"`) decodes fine but is not an object;
-		// callers expect a key/value map, so treat anything but an array as an empty body.
+		// A valid JSON scalar decodes fine but callers expect a key/value map.
 		return is_array($decoded) ? $decoded : [];
 	}
 

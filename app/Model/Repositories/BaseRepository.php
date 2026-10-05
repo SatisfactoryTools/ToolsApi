@@ -28,7 +28,6 @@ abstract class BaseRepository
 		}
 	}
 
-	/** Flushes changes accumulated by save(..., flush: false) calls. */
 	public function flush(): void
 	{
 		$this->entityManager->flush();

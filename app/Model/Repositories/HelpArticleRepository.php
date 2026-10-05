@@ -9,12 +9,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\HelpArticle;
 class HelpArticleRepository extends BaseRepository
 {
 
-	/**
-	 * Every article, category order first, then position within it. Uncategorised
-	 * articles sort last.
-	 *
-	 * @return HelpArticle[]
-	 */
+	/** @return HelpArticle[] */
 	public function getAll(): array
 	{
 		return $this->ordered()->getQuery()->getResult();

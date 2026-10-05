@@ -27,18 +27,15 @@ use Ramsey\Uuid\Uuid;
 class VersionsController extends BaseV1Controller
 {
 
-	/** Allowed recipe cost multipliers. */
 	private const RECIPE_COST_OPTIONS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
-	/** Allowed power cost multipliers. */
 	private const POWER_COST_OPTIONS = [0.25, 0.5, 0.75, 1.0, 2.0, 5.0];
 
-	/** Caps on the anonymous create endpoint, to bound stored/served payloads. */
+	/** Caps on the anonymous create endpoint, to bound stored payloads. */
 	private const NAME_MAX_LENGTH = 100;
 	private const MODS_MAX_COUNT = 16;
 	private const WORLD_DATA_MAX_BYTES = 65536;
 
-	/** Cap on one link request (syncing an anonymous browser's locally kept list). */
 	private const LINK_MAX_IDS = 200;
 
 	public function __construct(
@@ -51,13 +48,7 @@ class VersionsController extends BaseV1Controller
 	{
 	}
 
-	/**
-	 * Previews the resource nodes for a set of world settings, so the frontend can show
-	 * the resulting resource limits before a custom version is created. Runs the external
-	 * world-data-generator and returns node counts by resource type and purity. Open to
-	 * anonymous users; results are cached by (seed, mode, purity) on disk.
-	 * Body: { seed?: int = 0, mode?: string = 'none', purity?: string = 'no-change' }
-	 */
+	/** Previews resource nodes for world settings before a custom version is created. */
 	#[Path('/world-data')]
 	#[Method('POST')]
 	public function worldData(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -104,9 +95,7 @@ class VersionsController extends BaseV1Controller
 		/** @var User|null $user */
 		$user = $request->getAttribute('user');
 
-		// Authenticated users see public versions plus the custom versions linked to
-		// their account. Guests only see public (built-in) versions — the frontend keeps
-		// their custom version IDs client-side and loads them via GET /versions/{uuid}.
+		// Guests' custom version IDs are kept client-side and loaded via GET /versions/{uuid}.
 		$versions = $user !== null
 			? $this->versionRepository->getVisibleToUser($user)
 			: $this->versionRepository->getPublic();
@@ -114,14 +103,7 @@ class VersionsController extends BaseV1Controller
 		return $response->writeJsonBody(VersionResponse::fromArray($versions));
 	}
 
-	/**
-	 * Per-version plan statistics for the signed-in user (home page cards: "N plans",
-	 * "last edited …"), computed with one grouped query instead of loading every plan
-	 * tree. Keyed by version UUID; versions without plans are absent (= 0 plans).
-	 * Top-level plans are counted; folders and subplans are not. Must stay declared above
-	 * detail(): Apitte matches routes in declaration order and `/{uuid}` would otherwise
-	 * swallow this path.
-	 */
+	/** Must stay declared above detail(): Apitte matches routes in declaration order and `/{uuid}` would otherwise swallow this path. */
 	#[Path('/plan-counts')]
 	#[Method('GET')]
 	public function planCounts(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -145,16 +127,7 @@ class VersionsController extends BaseV1Controller
 		return $response->writeJsonBody(['versions' => (object) $versions]);
 	}
 
-	/**
-	 * Returns a single version by UUID or by URL slug, regardless of any account links.
-	 * Public and unauthenticated: the version UUID acts as an unguessable capability, and
-	 * the version's data file is served statically anyway. Only versions are exposed here —
-	 * never user content. Note the returned dataPath may point to a pruned file; use
-	 * POST /versions/{uuid}/data to (re)materialize it.
-	 *
-	 * The slug form is what lets a plan link into a custom version open for someone who
-	 * has never seen that version: the planner URL carries the slug, nothing else.
-	 */
+	/** Public: the UUID acts as an unguessable capability. Slugs are accepted because planner URLs carry only the slug. The dataPath may point to a pruned file; POST /versions/{uuid}/data regenerates it. */
 	#[Path('/{uuid}')]
 	#[Method('GET')]
 	#[RequestParameter(name: 'uuid', type: 'string', in: EndpointParameter::IN_PATH)]
@@ -173,11 +146,6 @@ class VersionsController extends BaseV1Controller
 		return $response->writeJsonBody(VersionResponse::fromEntity($version)->toArray());
 	}
 
-	/**
-	 * Makes sure the version's data file exists on disk (regenerating it if it was
-	 * pruned) and returns the current dataPath. The frontend calls this before fetching
-	 * the static file, and again whenever the static fetch returns 404.
-	 */
 	#[Path('/{uuid}/data')]
 	#[Method('POST')]
 	#[RequestParameter(name: 'uuid', type: 'string', in: EndpointParameter::IN_PATH)]
@@ -201,14 +169,6 @@ class VersionsController extends BaseV1Controller
 		]);
 	}
 
-	/**
-	 * Creates a custom version — open to anonymous users. The definition (base version,
-	 * ordered mods, multipliers, world data) is stored in the database; the data file is
-	 * generated as a cache artifact. An identical definition returns the existing version
-	 * (200) instead of creating a duplicate (201). Logged-in callers get the version
-	 * linked to their account automatically; anonymous callers must keep the returned id
-	 * client-side.
-	 */
 	#[Path('/')]
 	#[Method('POST')]
 	public function create(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -283,7 +243,6 @@ class VersionsController extends BaseV1Controller
 					->writeJsonBody(['error' => 'Field mods contains an invalid UUID: ' . (string) $modVersionId]);
 			}
 
-			// Anonymous callers can only use public mods; logged-in users also their own.
 			$modVersion = $user !== null
 				? $this->modVersionRepository->getByUuidVisibleToUser($modVersionUuid->toString(), $user)
 				: $this->modVersionRepository->getByUuidPublic($modVersionUuid->toString());
@@ -322,9 +281,7 @@ class VersionsController extends BaseV1Controller
 
 		$definitionHash = $this->fileService->definitionHash($name, $base, $modVersions, $recipeCost, $powerCost, $worldData);
 
-		// The lock serializes concurrent identical creations — without it, two requests
-		// could both miss the lookup and the second insert would hit the unique
-		// definitionHash constraint.
+		// Without the lock, two identical concurrent requests could both miss the lookup and the second insert would hit the unique definitionHash constraint.
 		/** @var array{Version, bool} [$version, $created] */
 		[$version, $created] = $this->fileService->withLock(
 			'definition-' . $definitionHash,
@@ -377,12 +334,7 @@ class VersionsController extends BaseV1Controller
 			->writeJsonBody(VersionResponse::fromEntity($version)->toArray());
 	}
 
-	/**
-	 * Links custom versions to the caller's account — used after login to adopt the
-	 * version IDs an anonymous browser accumulated client-side. Idempotent; unknown,
-	 * invalid or non-custom IDs are reported back so the frontend can drop them from
-	 * its local list. Body: { versions: string[] }
-	 */
+	/** Used after login to adopt the version IDs an anonymous browser accumulated client-side. */
 	#[Path('/link')]
 	#[Method('POST')]
 	public function link(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -436,11 +388,7 @@ class VersionsController extends BaseV1Controller
 		]);
 	}
 
-	/**
-	 * Removes the caller's link to a custom version ("delete" from their account). The
-	 * version itself and its file stay — other users or anonymous browsers may still
-	 * reference it, and unused files are reclaimed by the prune job.
-	 */
+	/** The version itself stays: others may still reference it, and unused files are reclaimed by the prune job. */
 	#[Path('/{uuid}/link')]
 	#[Method('DELETE')]
 	#[RequestParameter(name: 'uuid', type: 'string', in: EndpointParameter::IN_PATH)]
@@ -469,13 +417,8 @@ class VersionsController extends BaseV1Controller
 	}
 
 	/**
-	 * Validates the optional worldData payload sent on version creation: the node counts
-	 * and frontend-derived limits (plus the settings they were computed from), which get
-	 * stored in the database and stamped under metadata.world in the generated data file.
-	 * Only known keys are kept, and the payload size is capped since anyone can submit it.
-	 *
 	 * @param array<string, mixed> $body
-	 * @return array{0: array<string, mixed>|null, 1: string|null} [cleaned worldData or null, error or null]
+	 * @return array{0: array<string, mixed>|null, 1: string|null} [cleaned worldData, error]
 	 */
 	private function parseWorldData(array $body): array
 	{
@@ -536,10 +479,7 @@ class VersionsController extends BaseV1Controller
 		return [$clean, null];
 	}
 
-	/**
-	 * Coerces a JSON number (int or float) to float, or returns null if not numeric.
-	 * The allowed multipliers are all exact binary fractions, so strict comparison is safe.
-	 */
+	/** The allowed multipliers are all exact binary fractions, so strict comparison of the float is safe. */
 	private function normalizeMultiplier(mixed $value): ?float
 	{
 		if (is_int($value) || is_float($value)) {

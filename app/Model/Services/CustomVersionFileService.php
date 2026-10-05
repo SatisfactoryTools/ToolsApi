@@ -6,21 +6,11 @@ use greeny\SatisfactoryTools\Api\Model\Entities\ModVersion;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use RuntimeException;
 
-/**
- * Materializes custom version data files on demand. The database row (base version,
- * ordered mods, multipliers, world data) is the source of truth; the generated file is
- * a prunable cache artifact. Files are named custom/{uuid}-{inputsHash}.json where the
- * hash covers every generation input (including base/mod file contents), so a URL always
- * serves the same bytes and can be cached with `immutable, max-age=1y` — when an input
- * changes, the version simply gets a new URL.
- */
+/** The DB row is the source of truth; files are a prunable cache named custom/{uuid}-{inputsHash}.json, so a URL always serves the same bytes and can be cached as immutable. */
 class CustomVersionFileService
 {
 
-	/**
-	 * Bump when CustomVersionDataGenerator's output format or merge/multiplier logic
-	 * changes, so previously generated files stop being treated as current.
-	 */
+	/** Bump when the generator output or merge/multiplier logic changes, to invalidate previously generated files. */
 	private const GENERATOR_VERSION = 2;
 
 	private const CUSTOM_DIR = 'data/versions/custom';
@@ -34,9 +24,7 @@ class CustomVersionFileService
 	}
 
 	/**
-	 * Identity hash of a definition, used to deduplicate creation: two requests with the
-	 * same name, base, ordered mods, multipliers and world data map to the same version.
-	 *
+	 * Used to deduplicate creation.
 	 * @param ModVersion[] $modVersions in application order
 	 * @param array<string, mixed>|null $worldData
 	 */
@@ -62,14 +50,7 @@ class CustomVersionFileService
 		], JSON_THROW_ON_ERROR));
 	}
 
-	/**
-	 * Makes sure the version's data file exists on disk and that $version->dataPath
-	 * points at it. Generation is guarded by a per-version lock (concurrent requests
-	 * for a missing file generate it once) and the write itself is atomic.
-	 *
-	 * Returns true when dataPath was (re)assigned — the caller is responsible for
-	 * persisting the entity in that case.
-	 */
+	/** Returns true when dataPath was (re)assigned; the caller must persist the entity then. */
 	public function ensureFile(Version $version): bool
 	{
 		if (!$version->custom) {
@@ -117,10 +98,7 @@ class CustomVersionFileService
 	}
 
 	/**
-	 * Serializes a critical section on a named lock. Used internally per version, and by
-	 * the create endpoint per definition hash so concurrent identical creations cannot
-	 * both insert (the definitionHash column is unique).
-	 *
+	 * Also used by the create endpoint per definition hash, so concurrent identical creations cannot both insert (definitionHash is unique).
 	 * @template T
 	 * @param callable(): T $callback
 	 * @return T
@@ -131,8 +109,7 @@ class CustomVersionFileService
 			throw new RuntimeException(sprintf('Could not create lock directory: %s', $this->lockDir));
 		}
 
-		// Lock files are kept around (never unlinked) — removing a lock file while
-		// another process holds or waits on it reintroduces the race the lock prevents.
+		// Lock files are never unlinked; removing one while another process holds or waits on it reintroduces the race.
 		$handle = @fopen($this->lockDir . '/' . $name . '.lock', 'c');
 		if ($handle === false || !flock($handle, LOCK_EX)) {
 			throw new RuntimeException(sprintf('Could not acquire lock: %s', $name));
@@ -147,10 +124,7 @@ class CustomVersionFileService
 	}
 
 	/**
-	 * The current file path for a version: uuid plus a hash of all generation inputs.
-	 * File contents of the base and mods are hashed (not just their identities) because
-	 * official data files are republished in place and mod data can be re-uploaded.
-	 *
+	 * File contents are hashed, not just identities, because official data files are republished in place and mod data can be re-uploaded.
 	 * @param string[] $modDataPaths
 	 */
 	private function targetPath(Version $version, Version $base, array $modDataPaths): string
@@ -169,11 +143,7 @@ class CustomVersionFileService
 		return self::CUSTOM_DIR . '/' . $version->uuid->toString() . '-' . $hash . '.json';
 	}
 
-	/**
-	 * Deletes previously generated files of this version (older input hashes). Clients
-	 * holding the old URL either have it cached (immutable — no request is made) or get
-	 * a 404 and re-resolve the current URL via the API.
-	 */
+	/** Clients holding an old URL either have it cached (immutable) or get a 404 and re-resolve the current URL via the API. */
 	private function removeStaleFiles(Version $version, string $currentTarget): void
 	{
 		$pattern = $this->absolutePath(self::CUSTOM_DIR . '/' . $version->uuid->toString() . '-*.json');
@@ -194,9 +164,6 @@ class CustomVersionFileService
 	}
 
 	/**
-	 * Recursively sorts object keys so semantically equal structures always encode to
-	 * the same JSON (list order is preserved — it is significant).
-	 *
 	 * @param array<array-key, mixed> $data
 	 * @return array<array-key, mixed>
 	 */

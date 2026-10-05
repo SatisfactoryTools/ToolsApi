@@ -11,12 +11,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 class SharedVisitRepository extends BaseRepository
 {
 
-	/**
-	 * The user's visit entries, most recently visited first, with the share join-fetched
-	 * (the list response needs the frozen snapshot of every entry anyway).
-	 *
-	 * @return SharedVisit[]
-	 */
+	/** @return SharedVisit[] */
 	public function getByUserNewestFirst(User $user): array
 	{
 		return $this->getRepository()->createQueryBuilder('v')
@@ -35,11 +30,6 @@ class SharedVisitRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['user' => $user, 'share' => $share]);
 	}
 
-	/**
-	 * Upserts the visit entry keyed on (user, share): an existing entry only gets its
-	 * visitedAt refreshed, a new one is inserted. Inserting also trims the list back to
-	 * $cap entries by evicting the oldest, all in one transaction.
-	 */
 	public function recordVisit(User $user, Share $share, int $cap): void
 	{
 		$this->entityManager->wrapInTransaction(function () use ($user, $share, $cap): void {
@@ -58,8 +48,7 @@ class SharedVisitRepository extends BaseRepository
 			$this->entityManager->persist($visit);
 			$this->entityManager->flush();
 
-			// Trim everything beyond the cap (not just one row), so the list self-heals
-			// even if concurrent inserts ever left it oversized.
+			// Trim everything beyond the cap (not just one row), so the list self-heals if concurrent inserts ever left it oversized.
 			foreach (array_slice($this->getByUserNewestFirst($user), $cap) as $stale) {
 				$this->entityManager->remove($stale);
 			}

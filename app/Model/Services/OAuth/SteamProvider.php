@@ -2,20 +2,7 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
-/**
- * Steam sign-in via OpenID 2.0. Steam never exposes an email address — the only thing we
- * learn is the 64-bit Steam ID. Because matching is email-based, an unlinked Steam login
- * cannot create or match an account; Steam can only be linked to an already-existing user.
- *
- * OpenID 2.0 has no `state` parameter, so we carry our CSRF state inside the `return_to`
- * URL, which Steam signs and echoes back verbatim.
- *
- * The persona name and avatar are not part of OpenID; they come from the Steam Web API
- * and require an API key (`oauthSteamApiKey`). Without a key, sign-in still works and
- * simply records no nickname.
- * @see https://partner.steamgames.com/doc/features/auth#website
- * @see https://developer.valvesoftware.com/wiki/Steam_Web_API#GetPlayerSummaries_.28v0002.29
- */
+/** Steam sign-in via OpenID 2.0. Steam never exposes an email and matching is email-based, so Steam can only be linked to an existing user. OpenID 2.0 has no `state`, so our CSRF state rides inside the signed `return_to` URL. Persona name/avatar need the Web API key (`oauthSteamApiKey`); without it sign-in still works. */
 class SteamProvider extends AbstractOAuthProvider
 {
 
@@ -70,9 +57,7 @@ class SteamProvider extends AbstractOAuthProvider
 	}
 
 	/**
-	 * Best-effort lookup of the public persona name and avatar. A missing key or a Web API
-	 * hiccup must never break sign-in, so failures degrade to "no nickname".
-	 *
+	 * Best-effort: a missing key or Web API hiccup must never break sign-in.
 	 * @return array{0: string|null, 1: string|null} [personaName, avatarUrl]
 	 */
 	private function fetchProfile(string $steamId): array
@@ -102,9 +87,7 @@ class SteamProvider extends AbstractOAuthProvider
 	}
 
 	/**
-	 * Re-post the received OpenID fields with mode=check_authentication so Steam confirms
-	 * the signature is genuine (guards against a forged callback).
-	 *
+	 * Asks Steam to confirm the signature (check_authentication), guarding against a forged callback.
 	 * @param array<string, mixed> $params
 	 */
 	private function verifyAssertion(array $params): bool

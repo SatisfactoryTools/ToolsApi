@@ -10,19 +10,7 @@ use greeny\SatisfactoryTools\Api\Utils\MarkdownSections;
 use JsonException;
 use RuntimeException;
 
-/**
- * Writes the static files the help reader loads. The database is the source of truth and
- * only the editor touches it; every reader gets plain files from the web root, the same
- * way version and mod data are served.
- *
- *   data/help/index.json           the manifest: categories, and every published article's
- *                                  metadata (title, summary, keywords, topics, sections)
- *   data/help/articles/{slug}.json one article, body included
- *
- * The whole snapshot is rebuilt after every write - it is a handful of small files, and
- * rebuilding wholesale is the only way to keep cross-article data (see-also, category
- * membership, the topic map) consistent.
- */
+/** Writes the static help files served from the web root (data/help/index.json manifest, data/help/articles/{slug}.json per article); the DB stays the source of truth. The whole snapshot is rebuilt on every write to keep cross-article data (see-also, category membership, topic map) consistent. */
 class HelpSnapshotService
 {
 
@@ -37,7 +25,6 @@ class HelpSnapshotService
 	{
 	}
 
-	/** Regenerates index.json and every article file, dropping files of gone articles. */
 	public function rebuild(): void
 	{
 		$this->withLock(function (): void {
@@ -59,9 +46,7 @@ class HelpSnapshotService
 	}
 
 	/**
-	 * The manifest, also served by `GET /v1/help` so the frontend can fall back to the
-	 * API when the snapshot has not been generated yet.
-	 *
+	 * Also served by `GET /v1/help` as a fallback when the snapshot has not been generated yet.
 	 * @param HelpArticle[] $articles
 	 * @return array<string, mixed>
 	 */
@@ -100,11 +85,7 @@ class HelpSnapshotService
 		];
 	}
 
-	/**
-	 * One article as the reader receives it.
-	 *
-	 * @return array<string, mixed>
-	 */
+	/** @return array<string, mixed> */
 	public function articleFile(HelpArticle $article): array
 	{
 		return [
@@ -118,12 +99,7 @@ class HelpSnapshotService
 		];
 	}
 
-	/**
-	 * An article's manifest entry: everything the browser, the search and the
-	 * question-mark buttons need without fetching the body.
-	 *
-	 * @return array<string, mixed>
-	 */
+	/** @return array<string, mixed> */
 	private function summary(HelpArticle $article): array
 	{
 		return [
@@ -138,11 +114,7 @@ class HelpSnapshotService
 		];
 	}
 
-	/**
-	 * Serializes the rebuild: two editors saving at the same moment must not interleave
-	 * their writes. Same shape as CustomVersionFileService's lock, including keeping the
-	 * lock file around - unlinking it would reintroduce the race it prevents.
-	 */
+	/** Serializes rebuilds so concurrent saves don't interleave writes. The lock file is never unlinked - that would reintroduce the race. */
 	private function withLock(callable $callback): void
 	{
 		if (!is_dir($this->lockDir) && !@mkdir($this->lockDir, 0o775, true) && !is_dir($this->lockDir)) {
