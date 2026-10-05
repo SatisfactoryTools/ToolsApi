@@ -48,6 +48,8 @@ services:
 
 	- greeny\SatisfactoryTools\Api\Console\PruneVersionFilesCommand(wwwDir: %appDir%/../www)
 
+	- greeny\SatisfactoryTools\Api\Console\ImportLegacySharesCommand
+
 	authService:
 		factory: greeny\SatisfactoryTools\Api\Model\Services\AuthService(
 			jwtSecret: %jwt.secret%,

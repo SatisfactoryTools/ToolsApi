@@ -27,6 +27,9 @@ Then edit `config/local.neon` and set:
 
 - `jwtSecret` - a long random string (>= 32 chars) used to sign access tokens
 - `oauthCallbackBaseUrl` - the frontend page that receives provider redirects
+  (when the frontend moves to another host, change it and re-register the per-provider
+  redirect URIs - `{oauthCallbackBaseUrl}/{provider}` - in each provider's developer
+  console, or sign-ins fail with a redirect-URI mismatch)
 - the `oauth*ClientId` / `oauth*ClientSecret` pairs for the providers you enable
 - optionally `oauthSteamApiKey` (Steam Web API key) so Steam sign-ins record the persona
   name and avatar for display; sign-in works without it
@@ -147,6 +150,8 @@ Endpoints (v1)
   `GET /v1/shares/{uuid}` - load a share (public, no auth)
 - `GET /v1/shares/visited`, `PUT|DELETE /v1/shares/visited/{uuid}` - the user's
   visited-shares list (capped at 20 entries; see docs/shared-plans-api.md)
+- `GET /v1/legacy-shares/{slug}` - a production line shared through the old
+  satisfactorytools.com (public, no auth; see "Legacy shares" below)
 
 Help articles
 -------------
@@ -171,6 +176,34 @@ Editing is limited to accounts with the `help_editor` flag; there is no API that
 ```sql
 UPDATE user SET help_editor = 1 WHERE login = 'someone';
 ```
+
+Legacy shares
+-------------
+
+The old Satisfactory Tools API (api.satisfactorytools.com) stored shared production lines
+in its `shared` table and served them at `GET /v2/share/{slug}/`. They are carried over
+into `legacy_share` so the old links keep working after that API is retired:
+`GET /v1/legacy-shares/{slug}` answers with the stored document as is - the object
+`{ "metadata": {...}, "request": {...} }` at the top level, not wrapped in an envelope -
+plus `Cache-Control: public, max-age=86400` (shares never change), or `404` for an unknown
+slug. Nothing creates these rows but the import command:
+
+```sh
+# straight from the old database
+php bin/console legacy-shares:import --dsn="mysql:host=127.0.0.1;dbname=satisfactorytools" --user=root --password=secret
+
+# or from a JSON Lines dump made on the old server
+mysql -N -B -r -e "SELECT JSON_OBJECT('slug', slug, 'data', data) FROM shared" satisfactorytools > shared.jsonl
+php bin/console legacy-shares:import --file=/path/to/shared.jsonl
+```
+
+The dump holds one `{"slug": "...", "data": "..."}` object per line, `data` being the raw
+JSON string exactly as stored. Both modes stream the rows in batches (`--batch-size`,
+default 500) and upsert by slug, so re-running is safe: rows whose data already matches are
+skipped, changed rows are updated, and rows whose slug is not 1-64 alphanumeric characters
+or whose data is not a JSON object are counted as invalid and left out. The command prints
+progress per batch and a final imported / updated / unchanged / invalid summary. The
+`legacy_share` table is created by the usual `orm:schema-tool:create` / `update`.
 
 Importing game builds
 ----------------------
