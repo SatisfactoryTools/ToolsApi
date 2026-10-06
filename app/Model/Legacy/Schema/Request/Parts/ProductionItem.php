@@ -2,7 +2,6 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Request\Parts;
 
-/** Ported from the old API (app/Solver/Schema/Request/Parts/ProductionItem.php). */
 class ProductionItem
 {
 

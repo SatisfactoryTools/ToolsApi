@@ -20,15 +20,15 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class PublishCommand extends Command
 {
 
-	private const BRANCHES = ['stable', 'experimental'];
+	private const array BRANCHES = ['stable', 'experimental'];
 
-	private const VARIANTS = [
+	private const array VARIANTS = [
 		['suffix' => '', 'ficsmas' => false],
 		['suffix' => '-ficsmas', 'ficsmas' => true],
 	];
 
 	/** Matches the extractor's formatting. */
-	private const JSON_FLAGS = JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+	private const int JSON_FLAGS = JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
 
 	public function __construct(
 		private readonly VersionRepository $versionRepository,
@@ -81,7 +81,7 @@ class PublishCommand extends Command
 			$variants[] = $variant + ['dataPath' => $dataPath, 'absolute' => $absolute];
 		}
 
-		// Resource nodes are the same for both variants (FICSMAS only adds seasonal recipes/items), so generate the world once and stamp it into both files.
+		// Resource nodes are identical in both variants, so the world is generated once.
 		$worldData = null;
 		if (!$input->getOption('skip-world-data')) {
 			$io->writeln('Generating world data (seed 0, mode none, purity no-change)...');
@@ -168,7 +168,7 @@ class PublishCommand extends Command
 		?array $worldData,
 	): void
 	{
-		$contents = @file_get_contents($absolute);
+		$contents = @file_get_contents($absolute); // @ intentional
 		if ($contents === false) {
 			throw new \RuntimeException(sprintf('Could not read data file: %s', $absolute));
 		}
@@ -192,8 +192,8 @@ class PublishCommand extends Command
 		}
 
 		$tmp = $absolute . '.tmp';
-		if (@file_put_contents($tmp, $json) === false || !@rename($tmp, $absolute)) {
-			@unlink($tmp);
+		if (@file_put_contents($tmp, $json) === false || !@rename($tmp, $absolute)) { // @ intentional
+			@unlink($tmp); // @ intentional
 			throw new \RuntimeException(sprintf('Could not write data file: %s', $absolute));
 		}
 	}

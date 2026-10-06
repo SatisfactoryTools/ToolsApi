@@ -4,7 +4,6 @@ namespace greeny\SatisfactoryTools\Api\Model\Legacy;
 
 use RuntimeException;
 
-/** The legacy solver could not run: lp_solve missing, failing, or over its time limit. */
 class LegacySolverException extends RuntimeException
 {
 

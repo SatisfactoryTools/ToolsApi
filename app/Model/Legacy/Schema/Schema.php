@@ -21,16 +21,6 @@ use ReflectionNamedType;
 use ReflectionObject;
 use stdClass;
 
-/**
- * Maps a decoded game data file onto DocsSchema. Ported from the old API
- * (app/Solver/Schema/Schema.php): the same nette/schema structures built from the entity
- * classes by reflection, and the same conversion of the old export format (the one the
- * legacy data files under data/legacy use — items with `energyValue`/`liquid`, recipes with
- * `inMachine`, buildings with `metadata`, resources keyed by item) into the schema shape.
- * The schematic and material mappers were dropped: the old format never carried them and
- * the solver does not read them. The production request is built by LegacyRequestFactory
- * instead of the old `productionRequest()` mapper, which required every field.
- */
 class Schema
 {
 
@@ -42,7 +32,6 @@ class Schema
 	public static function schema(stdClass $data): DocsSchema
 	{
 		if (isset($data->data) && !isset($data->items)) {
-			// raw export file, data is wrapped together with build metadata
 			$data = $data->data;
 		}
 
@@ -98,13 +87,7 @@ class Schema
 		return self::processor()->process(self::$schemas['building'], $data);
 	}
 
-	/**
-	 * Builds a structure schema from entity class properties. Float properties accept ints,
-	 * backed enum properties accept their backing values, object properties are resolved recursively.
-	 * Array properties (other than plain string lists) must be passed in $items explicitly.
-	 *
-	 * @param NetteSchema[] $items
-	 */
+	/** @param NetteSchema[] $items */
 	private static function entity(object $entity, array $items = []): Structure
 	{
 		$reflection = new ReflectionObject($entity);
@@ -156,11 +139,6 @@ class Schema
 			->before(static fn ($value) => $value instanceof stdClass ? (array) $value : $value);
 	}
 
-	/**
-	 * Converts data stored in the old export format into the new schema shape,
-	 * so that versions imported before the data-utils rewrite keep working.
-	 * Only fields present in the old format are mapped.
-	 */
 	private static function convertLegacyData(stdClass $data): stdClass
 	{
 		$converted = new stdClass;

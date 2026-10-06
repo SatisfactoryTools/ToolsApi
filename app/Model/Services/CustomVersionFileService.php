@@ -6,14 +6,13 @@ use greeny\SatisfactoryTools\Api\Model\Entities\ModVersion;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use RuntimeException;
 
-/** The DB row is the source of truth; files are a prunable cache named custom/{uuid}-{inputsHash}.json, so a URL always serves the same bytes and can be cached as immutable. */
 class CustomVersionFileService
 {
 
 	/** Bump when the generator output or merge/multiplier logic changes, to invalidate previously generated files. */
-	private const GENERATOR_VERSION = 2;
+	private const int GENERATOR_VERSION = 2;
 
-	private const CUSTOM_DIR = 'data/versions/custom';
+	private const string CUSTOM_DIR = 'data/versions/custom';
 
 	public function __construct(
 		private readonly CustomVersionDataGenerator $dataGenerator,
@@ -24,8 +23,7 @@ class CustomVersionFileService
 	}
 
 	/**
-	 * Used to deduplicate creation.
-	 * @param ModVersion[] $modVersions in application order
+	 * @param ModVersion[] $modVersions
 	 * @param array<string, mixed>|null $worldData
 	 */
 	public function definitionHash(
@@ -50,7 +48,6 @@ class CustomVersionFileService
 		], JSON_THROW_ON_ERROR));
 	}
 
-	/** Returns true when dataPath was (re)assigned; the caller must persist the entity then. */
 	public function ensureFile(Version $version): bool
 	{
 		if (!$version->custom) {
@@ -98,19 +95,18 @@ class CustomVersionFileService
 	}
 
 	/**
-	 * Also used by the create endpoint per definition hash, so concurrent identical creations cannot both insert (definitionHash is unique).
 	 * @template T
 	 * @param callable(): T $callback
 	 * @return T
 	 */
 	public function withLock(string $name, callable $callback): mixed
 	{
-		if (!is_dir($this->lockDir) && !@mkdir($this->lockDir, 0o775, true) && !is_dir($this->lockDir)) {
+		if (!is_dir($this->lockDir) && !@mkdir($this->lockDir, 0o775, true) && !is_dir($this->lockDir)) { // @ intentional
 			throw new RuntimeException(sprintf('Could not create lock directory: %s', $this->lockDir));
 		}
 
 		// Lock files are never unlinked; removing one while another process holds or waits on it reintroduces the race.
-		$handle = @fopen($this->lockDir . '/' . $name . '.lock', 'c');
+		$handle = @fopen($this->lockDir . '/' . $name . '.lock', 'c'); // @ intentional
 		if ($handle === false || !flock($handle, LOCK_EX)) {
 			throw new RuntimeException(sprintf('Could not acquire lock: %s', $name));
 		}
@@ -143,20 +139,19 @@ class CustomVersionFileService
 		return self::CUSTOM_DIR . '/' . $version->uuid->toString() . '-' . $hash . '.json';
 	}
 
-	/** Clients holding an old URL either have it cached (immutable) or get a 404 and re-resolve the current URL via the API. */
 	private function removeStaleFiles(Version $version, string $currentTarget): void
 	{
 		$pattern = $this->absolutePath(self::CUSTOM_DIR . '/' . $version->uuid->toString() . '-*.json');
 		foreach (glob($pattern) ?: [] as $file) {
 			if ($file !== $this->absolutePath($currentTarget)) {
-				@unlink($file);
+				@unlink($file); // @ intentional
 			}
 		}
 	}
 
 	private function fileHash(string $relativePath): string
 	{
-		$hash = @hash_file('sha256', $this->absolutePath($relativePath));
+		$hash = @hash_file('sha256', $this->absolutePath($relativePath)); // @ intentional
 		if ($hash === false) {
 			throw new RuntimeException(sprintf('Data file not found: %s', $relativePath));
 		}

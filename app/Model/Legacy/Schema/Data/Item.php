@@ -7,7 +7,6 @@ use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\Parts\EquipSlot;
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\Parts\ItemForm;
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\Parts\StackSize;
 
-/** Ported from the old API (app/Solver/Schema/Data/Item.php); the property list drives the schema. */
 class Item
 {
 

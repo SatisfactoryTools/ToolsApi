@@ -9,7 +9,6 @@ use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use greeny\SatisfactoryTools\Api\Model\Repositories\FolderRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
 
-/** Builds the single node shape shared by ShareService (frozen snapshots) and PlanLinkService (live view), so the frontend viewer only ever sees one shape. */
 class PlanTreeBuilder
 {
 
@@ -90,10 +89,7 @@ class PlanTreeBuilder
 		];
 	}
 
-	/**
-	 * Carries no data path; the viewer resolves the version by id.
-	 * @return array<string, mixed>
-	 */
+	/** @return array<string, mixed> */
 	public function versionSnapshot(Version $version): array
 	{
 		return [

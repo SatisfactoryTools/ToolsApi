@@ -12,11 +12,6 @@ use greeny\SatisfactoryTools\Api\Model\Legacy\LegacySolverService;
 use JsonException;
 use Nette\Http\IResponse;
 
-/**
- * The old Satisfactory Tools' production solver (POST /v2/solver of api.satisfactorytools.com),
- * ported so production lines imported from the old tools calculate exactly as they did
- * there after that API is retired. Public, no auth — the old endpoint was too.
- */
 #[Path('/legacy-solver')]
 class LegacySolverController extends BaseV1Controller
 {
@@ -28,14 +23,6 @@ class LegacySolverController extends BaseV1Controller
 	{
 	}
 
-	/**
-	 * Body: { gameVersion: "0.8.0" | "1.0.0" | "1.0.0-ficsmas", request: {...} } where
-	 * `request` is the old IProductionDataRequest (resourceMax, resourceWeight,
-	 * blockedResources, blockedRecipes, blockedMachines, allowedAlternateRecipes,
-	 * sinkableResources, production, input), read leniently — see LegacyRequestFactory.
-	 * Answers { result: { column: value, ... } } with the old solver's column names; an
-	 * infeasible or empty solve is { result: {} } with 200, as the old API answered it.
-	 */
 	#[Path('/')]
 	#[Method('POST')]
 	public function solve(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -69,12 +56,7 @@ class LegacySolverController extends BaseV1Controller
 		return $response->writeJsonBody(['result' => (object) $result]);
 	}
 
-	/**
-	 * Unlike parseBodyString(), tells a JSON object apart from a missing, malformed or
-	 * non-object body — those are a client error here, not an empty request.
-	 *
-	 * @return array<string, mixed>|null
-	 */
+	/** @return array<string, mixed>|null */
 	private function decodeObject(string $body): ?array
 	{
 		try {

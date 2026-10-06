@@ -5,7 +5,6 @@ namespace greeny\SatisfactoryTools\Api\Model\Services;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
 use Ramsey\Uuid\Uuid;
 
-/** Unlike a share this is NOT frozen: every read returns the plan as it is right now, in the share payload shape so the viewer needs no second code path. */
 class PlanLinkService
 {
 
@@ -17,7 +16,7 @@ class PlanLinkService
 	}
 
 	/**
-	 * Only the requested plan's own flag is consulted: the frontend turns a whole subtree off together, and a subplan UUID is as unguessable as its parent's.
+	 * Only the requested plan's own flag is consulted: the frontend turns a whole subtree off together.
 	 * @return array<string, mixed>|null
 	 */
 	public function present(string $planUuid): ?array

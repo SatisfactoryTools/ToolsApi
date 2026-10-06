@@ -7,7 +7,6 @@ use Doctrine\ORM\Mapping as ORM;
 use greeny\SatisfactoryTools\Api\Model\Entities\Attributes\Identifier;
 use greeny\SatisfactoryTools\Api\Model\Entities\Attributes\Uuid;
 
-/** Readers never get articles from here but from the static snapshot HelpSnapshotService writes after every change. */
 #[ORM\Entity]
 #[ORM\Table(name: 'help_articles')]
 #[ORM\HasLifecycleCallbacks]
@@ -33,11 +32,11 @@ class HelpArticle
 	#[ORM\Column(type: 'json')]
 	public array $keywords = [];
 
-	/** @var array<string, string> topic id (referenced by the app's question-mark buttons) => anchor ('' for the top) */
+	/** @var array<string, string> */
 	#[ORM\Column(type: 'json')]
 	public array $topics = [];
 
-	/** @var string[] slugs */
+	/** @var string[] */
 	#[ORM\Column(type: 'json')]
 	public array $seeAlso = [];
 
@@ -48,7 +47,6 @@ class HelpArticle
 	#[ORM\Column]
 	public int $position = 0;
 
-	/** Drafts are served to editors only and stay out of the snapshot. */
 	#[ORM\Column]
 	public bool $published = false;
 

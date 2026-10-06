@@ -7,15 +7,15 @@ use JsonException;
 class WorldDataService
 {
 
-	public const MODES = ['none', 'random', 'basic-rich', 'advanced-rich', 'fossil-fuel-rich'];
+	public const array MODES = ['none', 'random', 'basic-rich', 'advanced-rich', 'fossil-fuel-rich'];
 
-	public const PURITY_SETTINGS = ['no-change', 'all-impure', 'decrease', 'all-normal', 'increase', 'all-pure', 'all-random'];
+	public const array PURITY_SETTINGS = ['no-change', 'all-impure', 'decrease', 'all-normal', 'increase', 'all-pure', 'all-random'];
 
-	public const DEFAULT_MODE = 'none';
+	public const string DEFAULT_MODE = 'none';
 
-	public const DEFAULT_PURITY = 'no-change';
+	public const string DEFAULT_PURITY = 'no-change';
 
-	private const PURITIES = ['impure', 'normal', 'pure'];
+	private const array PURITIES = ['impure', 'normal', 'pure'];
 
 	public function __construct(
 		private readonly string $generatorBin,
@@ -45,7 +45,7 @@ class WorldDataService
 			throw new WorldDataException('World data file not found');
 		}
 
-		// Results are deterministic per (seed, mode, purity), so they are cached on disk; the endpoint is open to anonymous users, so the per-key lock also prevents a thundering herd from running the expensive binary in parallel.
+		// The endpoint is anonymous, so the per-key lock keeps a thundering herd from running the expensive binary in parallel.
 		if ($this->cacheDir === '') {
 			return $this->generateUncached($seed, $mode, $purity);
 		}
@@ -88,7 +88,7 @@ class WorldDataService
 	/** @return array<string, mixed>|null */
 	private function readCache(string $cacheFile): ?array
 	{
-		$contents = @file_get_contents($cacheFile);
+		$contents = @file_get_contents($cacheFile); // @ intentional
 		if ($contents === false) {
 			return null;
 		}
@@ -106,13 +106,13 @@ class WorldDataService
 	private function writeCache(string $cacheFile, array $result): void
 	{
 		$dir = dirname($cacheFile);
-		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) {
+		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) { // @ intentional
 			return; // caching is best-effort — the result is still returned
 		}
 
 		$tmp = $cacheFile . '.tmp';
-		if (@file_put_contents($tmp, json_encode($result)) === false || !@rename($tmp, $cacheFile)) {
-			@unlink($tmp);
+		if (@file_put_contents($tmp, json_encode($result)) === false || !@rename($tmp, $cacheFile)) { // @ intentional
+			@unlink($tmp); // @ intentional
 		}
 	}
 
@@ -124,11 +124,11 @@ class WorldDataService
 	private function withLock(string $lockFile, callable $callback): mixed
 	{
 		$dir = dirname($lockFile);
-		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) {
+		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) { // @ intentional
 			return $callback(); // no lock dir — run unguarded rather than fail
 		}
 
-		$handle = @fopen($lockFile, 'c');
+		$handle = @fopen($lockFile, 'c'); // @ intentional
 		if ($handle === false || !flock($handle, LOCK_EX)) {
 			return $callback();
 		}
@@ -149,7 +149,7 @@ class WorldDataService
 	private function run(array $command): array
 	{
 		$descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-		$process = @proc_open($command, $descriptors, $pipes);
+		$process = @proc_open($command, $descriptors, $pipes); // @ intentional
 		if (!is_resource($process)) {
 			throw new WorldDataException('Could not start the world data generator');
 		}
@@ -168,7 +168,7 @@ class WorldDataService
 			$read = [$pipes[1], $pipes[2]];
 			$write = null;
 			$except = null;
-			if (@stream_select($read, $write, $except, 0, 200_000) > 0) {
+			if (@stream_select($read, $write, $except, 0, 200_000) > 0) { // @ intentional
 				foreach ($read as $stream) {
 					$chunk = fread($stream, 8192);
 					if ($chunk === false || $chunk === '') {
@@ -230,7 +230,6 @@ class WorldDataService
 	}
 
 	/**
-	 * Geysers have no resource (grouped by purity only); fracking cores carry a resource and satellites whose purities are what get counted.
 	 * @param array<string, mixed> $raw
 	 * @return array<string, mixed>
 	 */

@@ -21,7 +21,6 @@ class Mod
 	#[ORM\Column(length: 255)]
 	public string $name;
 
-	/** Public mods are usable by anyone but managed only by their author; private ones are author-only. */
 	#[ORM\Column]
 	public bool $public = false;
 

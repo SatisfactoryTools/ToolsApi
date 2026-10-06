@@ -8,12 +8,12 @@ use RuntimeException;
 class CustomVersionDataGenerator
 {
 
-	private const FLUID_FORMS = ['liquid', 'gas'];
+	private const array FLUID_FORMS = ['liquid', 'gas'];
 
 	/** Packaging/unpackaging must stay 1:1 or the fluid loop breaks. */
-	private const RECIPE_COST_EXEMPT_BUILDINGS = ['Desc_Packager_C'];
+	private const array RECIPE_COST_EXEMPT_BUILDINGS = ['Desc_Packager_C'];
 
-	private const RECIPE_COST_EXEMPT_RECIPES = ['Recipe_Alternate_DilutedPackagedFuel_C'];
+	private const array RECIPE_COST_EXEMPT_RECIPES = ['Recipe_Alternate_DilutedPackagedFuel_C'];
 
 	public function __construct(
 		private readonly string $wwwDir,
@@ -22,9 +22,8 @@ class CustomVersionDataGenerator
 	}
 
 	/**
-	 * All paths are web-root-relative, matching Version::$dataPath / ModVersion::$dataPath.
-	 * @param string[] $modDataPaths in application order
-	 * @param array<string, mixed>|null $worldData recorded under metadata.world; null leaves the base metadata untouched
+	 * @param string[] $modDataPaths
+	 * @param array<string, mixed>|null $worldData
 	 */
 	public function generate(
 		string $baseRelativePath,
@@ -142,7 +141,7 @@ class CustomVersionDataGenerator
 
 	/**
 	 * @param array<string, mixed> $data
-	 * @return array<string, true> set of fluid item class names
+	 * @return array<string, true>
 	 */
 	private function fluidItemLookup(array $data): array
 	{
@@ -159,7 +158,7 @@ class CustomVersionDataGenerator
 	private function readJson(string $relativePath): array
 	{
 		$absolute = $this->absolutePath($relativePath);
-		$contents = @file_get_contents($absolute);
+		$contents = @file_get_contents($absolute); // @ intentional
 		if ($contents === false) {
 			throw new RuntimeException(sprintf('Base version data file not found: %s', $relativePath));
 		}
@@ -176,7 +175,7 @@ class CustomVersionDataGenerator
 	{
 		$absolute = $this->absolutePath($relativePath);
 		$dir = dirname($absolute);
-		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) {
+		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) { // @ intentional
 			throw new RuntimeException(sprintf('Could not create directory: %s', $dir));
 		}
 
@@ -188,8 +187,8 @@ class CustomVersionDataGenerator
 
 		// Write-then-rename so readers (Apache serves these statically) never see a truncated file.
 		$tmp = $absolute . '.tmp';
-		if (@file_put_contents($tmp, $json) === false || !@rename($tmp, $absolute)) {
-			@unlink($tmp);
+		if (@file_put_contents($tmp, $json) === false || !@rename($tmp, $absolute)) { // @ intentional
+			@unlink($tmp); // @ intentional
 			throw new RuntimeException(sprintf('Could not write version data file: %s', $relativePath));
 		}
 	}

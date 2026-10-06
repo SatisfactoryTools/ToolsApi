@@ -9,14 +9,13 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-/** The files are pure cache (definitions live in the DB and pruned files are re-generated on demand via POST /v1/versions/{uuid}/data), so this only reclaims disk. Meant to run daily from cron. */
 #[AsCommand(name: 'versions:prune', description: 'Deletes generated custom version data files older than the retention period')]
 class PruneVersionFilesCommand extends Command
 {
 
-	private const CUSTOM_DIR = 'data/versions/custom';
+	private const string CUSTOM_DIR = 'data/versions/custom';
 
-	private const TMP_MAX_AGE = 3600;
+	private const int TMP_MAX_AGE = 3600;
 
 	public function __construct(
 		private readonly string $wwwDir,
@@ -48,7 +47,7 @@ class PruneVersionFilesCommand extends Command
 		$deleted = 0;
 		$kept = 0;
 		foreach (glob($dir . '/*.json') ?: [] as $file) {
-			$mtime = @filemtime($file);
+			$mtime = @filemtime($file); // @ intentional
 			if ($mtime === false || $mtime > $now - $days * 86400) {
 				$kept++;
 				continue;
@@ -57,18 +56,18 @@ class PruneVersionFilesCommand extends Command
 			if ($dryRun) {
 				$io->writeln('Would delete ' . basename($file));
 				$deleted++;
-			} elseif (@unlink($file)) {
+			} elseif (@unlink($file)) { // @ intentional
 				$deleted++;
 			} else {
 				$io->warning('Could not delete ' . basename($file));
 			}
 		}
 
-		// Crashed generations can leave *.tmp files behind; anything older than an hour is guaranteed dead (generation is bounded by the request lifetime).
+		// Crashed generations leave *.tmp files behind; any older than an hour are dead.
 		foreach (glob($dir . '/*.tmp') ?: [] as $file) {
-			$mtime = @filemtime($file);
+			$mtime = @filemtime($file); // @ intentional
 			if ($mtime !== false && $mtime <= $now - self::TMP_MAX_AGE && !$dryRun) {
-				@unlink($file);
+				@unlink($file); // @ intentional
 			}
 		}
 

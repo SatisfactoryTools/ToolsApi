@@ -28,10 +28,7 @@ class PlanRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['uuid' => $uuid]);
 	}
 
-	/**
-	 * `planCount` excludes subplans, but `lastUpdatedAt` includes them, since editing a subplan is still work done in that version.
-	 * @return array<string, array{planCount: int, lastUpdatedAt: DateTimeImmutable}> keyed by version UUID
-	 */
+	/** @return array<string, array{planCount: int, lastUpdatedAt: DateTimeImmutable}> */
 	public function getSummaryByVersionForUser(User $user): array
 	{
 		/** @var list<array{versionUuid: UuidInterface|string, planCount: int|string, lastUpdatedAt: string}> $rows */

@@ -7,22 +7,11 @@ use JsonException;
 use Nette\Caching\Cache;
 use Nette\Caching\Storage;
 
-/**
- * A compact per-version lookup for link previews: name, normalized description and icon
- * hash of every item, building and schematic, plus a one-line summary of every recipe.
- * Built lazily from the version's data file (several MB) on the first preview into that
- * version and kept in the Nette cache under the file's dataPath, so a regenerated custom
- * version file gets a fresh entry by itself and an API deploy (which wipes temp/cache)
- * starts clean.
- *
- * A missing file (a pruned custom version) is not regenerated here - a bot hit is not
- * worth that; the caller falls back to version-level metadata.
- */
 class VersionMetaIndex
 {
 
-	/** Same rule as the frontend's IconUrlService: anything not filename-safe has no image. */
-	private const ICON_PATTERN = '~^[A-Za-z0-9_-]+$~D';
+	/** Mirrors the frontend's IconUrlService. */
+	private const string ICON_PATTERN = '~^[A-Za-z0-9_-]+$~D';
 
 	private readonly Cache $cache;
 
@@ -60,8 +49,7 @@ class VersionMetaIndex
 			return null;
 		}
 
-		// No expiry: the key changes when the file does. The file dependency is a safety
-		// net for a file rewritten in place.
+		// No expiry: the key changes when the file does; the file dependency covers in-place rewrites.
 		$this->cache->save($key, $index, [Cache::Files => $file]);
 
 		return $index;
@@ -70,7 +58,7 @@ class VersionMetaIndex
 	/** @return array<string, mixed>|null */
 	private function build(string $file): ?array
 	{
-		$contents = @file_get_contents($file);
+		$contents = @file_get_contents($file); // @ intentional
 		if ($contents === false) {
 			return null;
 		}
@@ -119,9 +107,6 @@ class VersionMetaIndex
 	}
 
 	/**
-	 * "2× Wire → 1× Cable in Constructor, 2 s" - per-cycle amounts and the cycle time, as
-	 * the codex recipe row shows them. The icon is the first product's.
-	 *
 	 * @param array<string, array{name: string, description: string, icon?: string}> $items
 	 * @param array<string, array{name: string, description: string, icon?: string}> $buildings
 	 * @return array<string, array{name: string, alternate: bool, summary: string, icon?: string}>
@@ -186,8 +171,6 @@ class VersionMetaIndex
 	}
 
 	/**
-	 * The first machine's name, or where it is crafted by hand.
-	 *
 	 * @param array<string, mixed> $recipe
 	 * @param array<string, array{name: string}> $buildings
 	 */
@@ -207,7 +190,7 @@ class VersionMetaIndex
 		return null;
 	}
 
-	/** Mirrors RateFormatter.duration() on the frontend: "45 s", "5 min", "2 min 30 s". */
+	/** Mirrors the frontend's RateFormatter.duration(). */
 	private static function duration(float $seconds): string
 	{
 		if ($seconds < 60) {
@@ -219,7 +202,6 @@ class VersionMetaIndex
 		return $rest > 0 ? sprintf('%d min %s s', $minutes, self::number($rest)) : sprintf('%d min', $minutes);
 	}
 
-	/** Up to 4 decimals, trailing zeroes stripped ("2.5", never "2.50"). */
 	private static function number(float $value): string
 	{
 		$formatted = rtrim(rtrim(number_format($value, 4, '.', ''), '0'), '.');

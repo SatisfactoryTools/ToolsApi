@@ -4,12 +4,6 @@ namespace greeny\SatisfactoryTools\Api\Model\Legacy;
 
 use Nette\Utils\Strings;
 
-/**
- * Runs lp_solve on an LP-format model and parses its output. Ported from the old API
- * (app/Solver/LPSolver.php): the same `lp_solve -s3 -S3` invocation over stdin, the same
- * output parsing (including the "repeating decimals" expansion), the same results — the
- * only change is that the process is given a wall-clock limit instead of running forever.
- */
 class LPSolver
 {
 
@@ -20,14 +14,7 @@ class LPSolver
 	{
 	}
 
-	/**
-	 * Returns `['variables' => [name => value], 'recipes' => [name => value]]` with the
-	 * non-zero values as lp_solve printed them (strings), or null when the model has no
-	 * solution (infeasible / unbounded).
-	 *
-	 * @return array{variables: array<string, string>, recipes: array<string, string>}|null
-	 * @throws LegacySolverException when lp_solve cannot be started, writes to stderr, or times out
-	 */
+	/** @return array{variables: array<string, string>, recipes: array<string, string>}|null */
 	public function call(string $request): ?array
 	{
 		$pipeDesc = [
@@ -36,7 +23,7 @@ class LPSolver
 			['pipe', 'w'],
 		];
 
-		$process = @proc_open([$this->lpSolveBin, '-s3', '-S3'], $pipeDesc, $pipes);
+		$process = @proc_open([$this->lpSolveBin, '-s3', '-S3'], $pipeDesc, $pipes); // @ intentional
 
 		if (!is_resource($process)) {
 			throw new LegacySolverException('lp_solve not found');
@@ -54,8 +41,7 @@ class LPSolver
 	}
 
 	/**
-	 * Drains stdout and stderr until the process exits, killing it when the deadline
-	 * passes. Both pipes are read together so a full pipe buffer cannot deadlock lp_solve.
+	 * Both pipes are read together so a full pipe buffer cannot deadlock lp_solve.
 	 *
 	 * @param resource $process
 	 * @param array<int, resource> $pipes
@@ -76,7 +62,7 @@ class LPSolver
 			$read = [$pipes[1], $pipes[2]];
 			$write = null;
 			$except = null;
-			if (@stream_select($read, $write, $except, 0, 200_000) > 0) {
+			if (@stream_select($read, $write, $except, 0, 200_000) > 0) { // @ intentional
 				foreach ($read as $stream) {
 					$chunk = fread($stream, 8192);
 					if ($chunk === false || $chunk === '') {
@@ -103,7 +89,6 @@ class LPSolver
 			}
 		}
 
-		// Drain whatever the process buffered right before it exited.
 		foreach ([1, 2] as $i) {
 			while (($chunk = fread($pipes[$i], 8192)) !== false && $chunk !== '') {
 				if ($i === 1) {
@@ -153,8 +138,6 @@ class LPSolver
 	}
 
 	/**
-	 * Tries to detect repeating parts of numbers and expand their precision.
-	 *
 	 * @param array<string, string> $numbers
 	 * @return array<string, string>
 	 */

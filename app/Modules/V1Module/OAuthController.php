@@ -31,11 +31,6 @@ class OAuthController extends BaseV1Controller
 		return $response->writeJsonBody(['providers' => $this->oauthService->getProviderKeys()]);
 	}
 
-	/** With a valid Bearer token, the flow links the provider to that account instead of logging in. *
-	 * The desktop app sends `{"desktop": true}` and gets a `pollToken` back as well: the
-	 * provider redirects to the web frontend in the system browser, so the app collects
-	 * the outcome from /desktop/poll instead.
-	 */
 	#[Path('/{provider}/start')]
 	#[Method('POST')]
 	#[RequestParameter(name: 'provider', type: 'string', in: EndpointParameter::IN_PATH)]
@@ -62,10 +57,6 @@ class OAuthController extends BaseV1Controller
 		return $response->writeJsonBody($result);
 	}
 
-	/** The frontend forwards the query parameters the provider redirected back with (for Steam, all `openid.*` fields plus `state`). *
-	 * For a flow the desktop app started, the tokens are not handed to the browser: they
-	 * are kept for the app's poll and the browser only learns that the flow finished.
-	 */
 	#[Path('/{provider}/callback')]
 	#[Method('POST')]
 	#[RequestParameter(name: 'provider', type: 'string', in: EndpointParameter::IN_PATH)]
@@ -107,11 +98,6 @@ class OAuthController extends BaseV1Controller
 		return $response->writeJsonBody($body);
 	}
 
-	/**
-	 * The desktop app's poll for a flow it started with `{"desktop": true}`: 202 while the
-	 * browser side is still in progress, then the callback's response body exactly once
-	 * (200, or 400 with `error` when the sign-in failed).
-	 */
 	#[Path('/desktop/poll')]
 	#[Method('POST')]
 	public function desktopPoll(ApiRequest $request, ApiResponse $response): ApiResponse

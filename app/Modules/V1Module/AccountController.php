@@ -12,14 +12,14 @@ use greeny\SatisfactoryTools\Api\Model\Repositories\UserRepository;
 use greeny\SatisfactoryTools\Api\Schema\Responses\Auth\ProfileResponse;
 use Nette\Http\IResponse;
 
-/** Lives outside /v1/auth on purpose so the frontend's regular auth interceptor (Bearer header, token refresh) applies to it. */
+// Outside /v1/auth on purpose, so the frontend's regular auth interceptor applies to it.
 #[Path('/account')]
 class AccountController extends BaseV1Controller
 {
 
-	/** MAX also matches the column width. */
-	private const DISPLAY_NAME_MIN_LENGTH = 1;
-	private const DISPLAY_NAME_MAX_LENGTH = 50;
+	// MAX matches the column width.
+	private const int DISPLAY_NAME_MIN_LENGTH = 1;
+	private const int DISPLAY_NAME_MAX_LENGTH = 50;
 
 	public function __construct(
 		private readonly UserRepository $userRepository,
@@ -66,7 +66,6 @@ class AccountController extends BaseV1Controller
 
 		$displayName = null;
 		if ($raw !== null) {
-			// Collapse inner whitespace runs and drop control characters so the name renders the same everywhere.
 			$displayName = trim((string) preg_replace('/\s+/u', ' ', (string) preg_replace('/\p{C}+/u', '', $raw)));
 			if ($displayName === '') {
 				$displayName = null;

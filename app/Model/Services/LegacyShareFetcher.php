@@ -5,36 +5,20 @@ namespace greeny\SatisfactoryTools\Api\Model\Services;
 use JsonException;
 use Nette\Utils\Json;
 
-/**
- * Loads a shared production line from the old Satisfactory Tools API while it is still
- * up: GET {sourceUrl}{slug}/ (the old GET /v2/share/{slug}/), which answers the envelope
- * `{"code": 200, "data": {"metadata": ..., "request": ...}}` (its BaseV1Presenter::send
- * merges `code` into the presenter's data) or a 404 envelope for an unknown slug. Only the
- * `data` object is of interest: re-encoded with Nette's Json (the flags the old API stored
- * it with) it is the same document the import command copies into legacy_share.
- */
 class LegacyShareFetcher
 {
 
-	/** Seconds for the whole request, connection included. */
-	private const TIMEOUT = 10;
+	private const int TIMEOUT = 10;
 
 	public function __construct(private readonly string $sourceUrl)
 	{
 	}
 
-	/** False when the fallback is switched off (empty `legacyShareSourceUrl`). */
 	public function isEnabled(): bool
 	{
 		return $this->sourceUrl !== '';
 	}
 
-	/**
-	 * Returns the share document as a JSON string (`{"metadata": ..., "request": ...}`),
-	 * or null when the old API does not know the slug.
-	 *
-	 * @throws LegacyShareFetchException on any other failure
-	 */
 	public function fetch(string $slug): ?string
 	{
 		if (!$this->isEnabled()) {

@@ -24,7 +24,7 @@ class ProfileResponse
 	{
 	}
 
-	/** @param list<OAuthIdentity> $identities oldest first */
+	/** @param list<OAuthIdentity> $identities */
 	public static function fromUser(User $user, array $identities): self
 	{
 		$connections = [];

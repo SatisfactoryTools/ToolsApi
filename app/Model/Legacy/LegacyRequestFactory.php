@@ -7,20 +7,6 @@ use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Request\Parts\ProductionInp
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Request\Parts\ProductionItem;
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Request\ProductionRequest;
 
-/**
- * Turns the old tools' request document (IProductionDataRequest, the `request` of a
- * share) into the ProductionRequest the solver runs, leniently: missing lists and maps are
- * empty, unknown fields are ignored, rows without an item are dropped. On top of the plain
- * mapping it does the two things that used to happen outside the old solver:
- *
- * - folds `blockedMachines` into the recipe lists the way the old client's
- *   ProductionTab.buildApiRequest() did before calling the API (the API never saw
- *   blockedMachines): an allowed alternate recipe made in a blocked machine is dropped,
- *   a base recipe made in a blocked machine is blocked;
- * - fills `resourceMax` / `resourceWeight` for every resource of the game data the
- *   request does not mention with the old client's defaults (LegacyResourceDefaults),
- *   since the solver reads both for every resource.
- */
 class LegacyRequestFactory
 {
 
@@ -48,13 +34,7 @@ class LegacyRequestFactory
 		return $request;
 	}
 
-	/**
-	 * Ported from the old client (satisfactorytools: src/Tools/Production/ProductionTab.ts,
-	 * buildApiRequest). `getBaseItemRecipes()` there meant "not alternate and inMachine",
-	 * which in the schema is a non-alternate recipe with a non-empty producedIn.
-	 *
-	 * @param string[] $blockedMachines
-	 */
+	/** @param string[] $blockedMachines */
 	private function foldBlockedMachines(ProductionRequest $request, array $blockedMachines, DocsSchema $schema): void
 	{
 		$allowedAlts = [];
@@ -150,8 +130,7 @@ class LegacyRequestFactory
 	}
 
 	/**
-	 * Numbers keep their JSON type (int stays int) so the model text the solver writes
-	 * matches what the old API produced from the same request.
+	 * Numbers keep their JSON type so the solver's model text matches the old API's.
 	 *
 	 * @return array<string, int|float>
 	 */

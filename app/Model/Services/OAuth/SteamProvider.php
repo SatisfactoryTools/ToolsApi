@@ -2,7 +2,7 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
-/** Steam sign-in via OpenID 2.0. Steam never exposes an email and matching is email-based, so Steam can only be linked to an existing user. OpenID 2.0 has no `state`, so our CSRF state rides inside the signed `return_to` URL. Persona name/avatar need the Web API key (`oauthSteamApiKey`); without it sign-in still works. */
+/** OpenID 2.0 has no `state`, so our CSRF state rides inside the signed `return_to` URL. */
 class SteamProvider extends AbstractOAuthProvider
 {
 
@@ -58,7 +58,7 @@ class SteamProvider extends AbstractOAuthProvider
 
 	/**
 	 * Best-effort: a missing key or Web API hiccup must never break sign-in.
-	 * @return array{0: string|null, 1: string|null} [personaName, avatarUrl]
+	 * @return array{0: string|null, 1: string|null}
 	 */
 	private function fetchProfile(string $steamId): array
 	{
@@ -86,10 +86,7 @@ class SteamProvider extends AbstractOAuthProvider
 		];
 	}
 
-	/**
-	 * Asks Steam to confirm the signature (check_authentication), guarding against a forged callback.
-	 * @param array<string, mixed> $params
-	 */
+	/** @param array<string, mixed> $params */
 	private function verifyAssertion(array $params): bool
 	{
 		$form = ['openid.mode' => 'check_authentication'];

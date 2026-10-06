@@ -4,7 +4,6 @@ namespace greeny\SatisfactoryTools\Api\Schema\Responses;
 
 use greeny\SatisfactoryTools\Api\Model\Entities\HelpArticle;
 
-/** Editor view only - readers get the static snapshot files instead. */
 class HelpArticleResponse
 {
 

@@ -2,19 +2,13 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Services\Meta;
 
-/**
- * Ready-to-print link preview metadata for one frontend page (GET /v1/meta). Every value
- * is plain text; the caller escapes it for HTML.
- */
 final class PageMeta
 {
 
 	public function __construct(
 		public readonly string $title,
 		public readonly string $description,
-		/** Absolute URL, or null for the default logo (the injector fills it in). */
 		public readonly ?string $image,
-		/** default, page, codex-section, codex-item, … - for debugging and og:type. */
 		public readonly string $kind,
 	)
 	{

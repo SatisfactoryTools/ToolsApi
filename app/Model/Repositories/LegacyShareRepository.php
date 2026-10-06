@@ -14,9 +14,6 @@ class LegacyShareRepository extends BaseRepository
 	}
 
 	/**
-	 * Loads the shares for a set of slugs in one query, keyed by slug. Slugs with no row
-	 * are simply absent from the result.
-	 *
 	 * @param list<string> $slugs
 	 * @return array<string, LegacyShare>
 	 */

@@ -10,31 +10,19 @@ use JsonException;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
-/**
- * Turns a frontend path (plus query string) into the link preview metadata of that page,
- * for the web layer's index.php to print into <head>. Mirrors the frontend's routes
- * (sftools-frontend: src/app/RouteList.ts) and its client-side titles
- * (src/app/Model/Meta/PageMetaService.ts and the route titles) - keep all three in sync.
- *
- * Never fails: anything unknown, missing or broken yields the site defaults.
- */
+/** Mirrors the frontend routes (sftools-frontend: src/app/RouteList.ts) - keep in sync. */
 class MetaResolver
 {
 
-	public const PATH_MAX_LENGTH = 512;
+	public const int PATH_MAX_LENGTH = 512;
 
-	/** First URL segments that are never a version slug. Keep in sync with RouteList.ts. */
-	private const RESERVED_SEGMENTS = [
+	/** Keep in sync with RouteList.ts. */
+	private const array RESERVED_SEGMENTS = [
 		'settings', 'about', 'create-version', 'mods', 'mod-editor', 'help', 'auth', 'account', 'shared',
-		// The old tools' addresses, redirected by the app.
 		'0.8', '1.0', '1.0-ficsmas', 'production', 'codex', 'import',
 	];
 
-	/**
-	 * Fixed pages: [title, description]; a null description = the default one. Keyed by
-	 * the first segment, or "first/second" where the second one matters.
-	 */
-	private const FIXED_PAGES = [
+	private const array FIXED_PAGES = [
 		'about' => ['About', 'Who makes Satisfactory Tools, what it can do, and where to report a bug or ask for a feature.'],
 		'create-version' => ['Create custom version', 'Make your own game version: add mods, change recipe and power costs, and set up a different world.'],
 		'mods' => ['Mods', 'Upload and manage mod data, then use the mods in your custom game versions.'],
@@ -49,17 +37,16 @@ class MetaResolver
 		'auth/reset-password' => ['Reset password', null],
 	];
 
-	/** Codex section → [title, plural noun, singular label for an entity without a description]. */
-	private const CODEX_SECTIONS = [
+	private const array CODEX_SECTIONS = [
 		'items' => ['Items', 'items', 'Item'],
 		'recipes' => ['Recipes', 'recipes', 'Recipe'],
 		'buildings' => ['Buildings', 'buildings', 'Building'],
 		'schematics' => ['Schematics', 'schematics', 'Schematic'],
 	];
 
-	private const HELP_INDEX = 'data/help/index.json';
+	private const string HELP_INDEX = 'data/help/index.json';
 
-	private const UUID_PATTERN = '~^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$~D';
+	private const string UUID_PATTERN = '~^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$~D';
 
 	public function __construct(
 		private readonly VersionRepository $versionRepository,
@@ -161,7 +148,7 @@ class MetaResolver
 		);
 	}
 
-	/** @param string[] $path the codex path after "codex", e.g. ['items', 'Desc_Cable_C'] */
+	/** @param string[] $path */
 	private function codex(Version $version, array $path): ?PageMeta
 	{
 		if ($path === []) {
@@ -256,12 +243,7 @@ class MetaResolver
 		);
 	}
 
-	/**
-	 * Plans in a shared folder tree, its subfolders included; subplans are part of their
-	 * plan and do not count.
-	 *
-	 * @param array<string, mixed> $folder
-	 */
+	/** @param array<string, mixed> $folder */
 	private function countPlans(array $folder): int
 	{
 		$count = is_array($folder['plans'] ?? null) ? count($folder['plans']) : 0;
@@ -282,7 +264,6 @@ class MetaResolver
 		}
 		$index = $this->versionMetaIndex->forVersion($version);
 
-		// An item or a building, like the frontend's Data.iconForClassName().
 		return $this->imageUrl($index['items'][$className]['icon'] ?? $index['buildings'][$className]['icon'] ?? null);
 	}
 
@@ -305,7 +286,7 @@ class MetaResolver
 	private function helpSummary(string $slug): ?array
 	{
 		$file = rtrim($this->wwwDir, '/') . '/' . self::HELP_INDEX;
-		$contents = is_file($file) ? @file_get_contents($file) : false;
+		$contents = is_file($file) ? @file_get_contents($file) : false; // @ intentional
 		if ($contents !== false) {
 			try {
 				$manifest = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
@@ -320,7 +301,6 @@ class MetaResolver
 			return ['title' => $entry['title'], 'summary' => is_string($entry['summary'] ?? null) ? $entry['summary'] : ''];
 		}
 
-		// No snapshot written yet: the database is the source of truth.
 		$article = $this->helpArticleRepository->getBySlug($slug);
 		if ($article === null || !$article->published) {
 			return null;

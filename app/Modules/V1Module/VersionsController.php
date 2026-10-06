@@ -27,16 +27,15 @@ use Ramsey\Uuid\Uuid;
 class VersionsController extends BaseV1Controller
 {
 
-	private const RECIPE_COST_OPTIONS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+	private const array RECIPE_COST_OPTIONS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
-	private const POWER_COST_OPTIONS = [0.25, 0.5, 0.75, 1.0, 2.0, 5.0];
+	private const array POWER_COST_OPTIONS = [0.25, 0.5, 0.75, 1.0, 2.0, 5.0];
 
-	/** Caps on the anonymous create endpoint, to bound stored payloads. */
-	private const NAME_MAX_LENGTH = 100;
-	private const MODS_MAX_COUNT = 16;
-	private const WORLD_DATA_MAX_BYTES = 65536;
+	private const int NAME_MAX_LENGTH = 100;
+	private const int MODS_MAX_COUNT = 16;
+	private const int WORLD_DATA_MAX_BYTES = 65536;
 
-	private const LINK_MAX_IDS = 200;
+	private const int LINK_MAX_IDS = 200;
 
 	public function __construct(
 		private readonly VersionRepository $versionRepository,
@@ -48,7 +47,6 @@ class VersionsController extends BaseV1Controller
 	{
 	}
 
-	/** Previews resource nodes for world settings before a custom version is created. */
 	#[Path('/world-data')]
 	#[Method('POST')]
 	public function worldData(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -80,7 +78,6 @@ class VersionsController extends BaseV1Controller
 		try {
 			$data = $this->worldDataService->generate($seed, $mode, $purity);
 		} catch (WorldDataException $e) {
-			// The generator is an upstream dependency; a failure here is a bad gateway.
 			return $response->withStatus(IResponse::S502_BadGateway)
 				->writeJsonBody(['error' => 'Could not generate world data', 'detail' => $e->getMessage()]);
 		}
@@ -95,7 +92,6 @@ class VersionsController extends BaseV1Controller
 		/** @var User|null $user */
 		$user = $request->getAttribute('user');
 
-		// Guests' custom version IDs are kept client-side and loaded via GET /versions/{uuid}.
 		$versions = $user !== null
 			? $this->versionRepository->getVisibleToUser($user)
 			: $this->versionRepository->getPublic();
@@ -103,7 +99,7 @@ class VersionsController extends BaseV1Controller
 		return $response->writeJsonBody(VersionResponse::fromArray($versions));
 	}
 
-	/** Must stay declared above detail(): Apitte matches routes in declaration order and `/{uuid}` would otherwise swallow this path. */
+	// Must stay declared above detail(): routes match in declaration order and /{uuid} would swallow this path.
 	#[Path('/plan-counts')]
 	#[Method('GET')]
 	public function planCounts(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -127,7 +123,6 @@ class VersionsController extends BaseV1Controller
 		return $response->writeJsonBody(['versions' => (object) $versions]);
 	}
 
-	/** Public: the UUID acts as an unguessable capability. Slugs are accepted because planner URLs carry only the slug. The dataPath may point to a pruned file; POST /versions/{uuid}/data regenerates it. */
 	#[Path('/{uuid}')]
 	#[Method('GET')]
 	#[RequestParameter(name: 'uuid', type: 'string', in: EndpointParameter::IN_PATH)]
@@ -279,7 +274,7 @@ class VersionsController extends BaseV1Controller
 
 		$definitionHash = $this->fileService->definitionHash($name, $base, $modVersions, $recipeCost, $powerCost, $worldData);
 
-		// Without the lock, two identical concurrent requests could both miss the lookup and the second insert would hit the unique definitionHash constraint.
+		// Locked so concurrent identical requests don't both miss the lookup and collide on the unique definitionHash.
 		/** @var array{Version, bool} [$version, $created] */
 		[$version, $created] = $this->fileService->withLock(
 			'definition-' . $definitionHash,
@@ -332,7 +327,6 @@ class VersionsController extends BaseV1Controller
 			->writeJsonBody(VersionResponse::fromEntity($version)->toArray());
 	}
 
-	/** Used after login to adopt the version IDs an anonymous browser accumulated client-side. */
 	#[Path('/link')]
 	#[Method('POST')]
 	public function link(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -386,7 +380,7 @@ class VersionsController extends BaseV1Controller
 		]);
 	}
 
-	/** The version itself stays: others may still reference it, and unused files are reclaimed by the prune job. */
+	// The version itself stays: others may still reference it; the prune job reclaims unused files.
 	#[Path('/{uuid}/link')]
 	#[Method('DELETE')]
 	#[RequestParameter(name: 'uuid', type: 'string', in: EndpointParameter::IN_PATH)]
@@ -416,7 +410,7 @@ class VersionsController extends BaseV1Controller
 
 	/**
 	 * @param array<string, mixed> $body
-	 * @return array{0: array<string, mixed>|null, 1: string|null} [cleaned worldData, error]
+	 * @return array{0: array<string, mixed>|null, 1: string|null}
 	 */
 	private function parseWorldData(array $body): array
 	{
@@ -477,7 +471,7 @@ class VersionsController extends BaseV1Controller
 		return [$clean, null];
 	}
 
-	/** The allowed multipliers are all exact binary fractions, so strict comparison of the float is safe. */
+	// The allowed multipliers are exact binary fractions, so strict float comparison is safe.
 	private function normalizeMultiplier(mixed $value): ?float
 	{
 		if (is_int($value) || is_float($value)) {

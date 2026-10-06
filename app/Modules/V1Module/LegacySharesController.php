@@ -19,21 +19,13 @@ use Nette\Http\IResponse;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
-/**
- * Shares imported from the old Satisfactory Tools API (see LegacyShare). Public and
- * read-only: the slug is the capability, exactly as it was on the old site. Rows come from
- * `bin/console legacy-shares:import` — and, until that has run, from the old API itself:
- * a slug that is not stored locally is fetched from there (LegacyShareFetcher) and kept.
- */
 #[Path('/legacy-shares')]
 class LegacySharesController extends BaseV1Controller
 {
 
-	/** The old API generated 20-char alphanumeric slugs; anything else cannot exist. */
-	private const SLUG_PATTERN = '~^[A-Za-z0-9]{1,64}$~D';
+	private const string SLUG_PATTERN = '~^[A-Za-z0-9]{1,64}$~D';
 
-	/** Shares are immutable, so clients and proxies may cache a hit for a day. */
-	private const CACHE_CONTROL = 'public, max-age=86400';
+	private const string CACHE_CONTROL = 'public, max-age=86400';
 
 	public function __construct(
 		private readonly LegacyShareRepository $legacyShareRepository,
@@ -43,18 +35,6 @@ class LegacySharesController extends BaseV1Controller
 	{
 	}
 
-	/**
-	 * Returns the stored document — `{ "metadata": {...}, "request": {...} }` — at the top
-	 * level, not wrapped in an envelope. The body is the raw JSON as imported, written as
-	 * is, so the response is byte-identical to what the old API had stored. 404 for an
-	 * unknown or malformed slug.
-	 *
-	 * When the slug is not stored — or the `legacy_share` table does not exist yet — and a
-	 * `legacyShareSourceUrl` is configured, the document is fetched from the old API and
-	 * answered in the same shape; a fetched document is also stored (when the table is
-	 * there) so the next request is local and the import later finds the row unchanged.
-	 * The old API's 404 is a 404 here; any other failure there is a 502.
-	 */
 	#[Path('/{slug}')]
 	#[Method('GET')]
 	#[RequestParameter(name: 'slug', type: 'string', in: EndpointParameter::IN_PATH)]
@@ -69,8 +49,7 @@ class LegacySharesController extends BaseV1Controller
 		try {
 			$share = $this->legacyShareRepository->getBySlug($slug);
 		} catch (TableNotFoundException) {
-			// Not imported yet: the table is created by the schema update of the deploy
-			// that ships the import, or by orm:schema-tool:update by hand.
+			// The table may not exist until the schema update that ships the import has run.
 			$share = null;
 			$tableExists = false;
 		} catch (DbalException $e) {
@@ -105,11 +84,7 @@ class LegacySharesController extends BaseV1Controller
 		return $this->document($response, $data);
 	}
 
-	/**
-	 * Write-through of a fetched share. Best effort: a failure (a concurrent request that
-	 * stored the same slug first, a closed connection, ...) is logged and the response is
-	 * served from the fetched copy regardless.
-	 */
+	// Best effort: on failure the response is still served from the fetched copy.
 	private function store(string $slug, string $data): void
 	{
 		try {

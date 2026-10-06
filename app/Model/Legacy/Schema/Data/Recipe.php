@@ -5,7 +5,6 @@ namespace greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data;
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\Parts\Event;
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\Parts\ItemAmount;
 
-/** Ported from the old API (app/Solver/Schema/Data/Recipe.php); the property list drives the schema. */
 class Recipe
 {
 

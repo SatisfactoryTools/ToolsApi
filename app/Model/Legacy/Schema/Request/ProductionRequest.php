@@ -5,17 +5,13 @@ namespace greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Request;
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Request\Parts\ProductionInput;
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Request\Parts\ProductionItem;
 
-/**
- * The old API's production request (its IProductionDataRequest). Ported from the old API
- * (app/Solver/Schema/Request/ProductionRequest.php); built by LegacyRequestFactory.
- */
 class ProductionRequest
 {
 
 	public string $gameVersion = '';
-	/** @var array<string, int|float> resource class => limit per minute */
+	/** @var array<string, int|float> */
 	public array $resourceMax = [];
-	/** @var array<string, int|float> resource class => weight */
+	/** @var array<string, int|float> */
 	public array $resourceWeight = [];
 	/** @var string[] */
 	public array $blockedResources = [];

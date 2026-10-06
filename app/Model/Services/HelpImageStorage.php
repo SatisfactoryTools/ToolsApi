@@ -6,20 +6,19 @@ use Ramsey\Uuid\UuidInterface;
 use RuntimeException;
 use finfo;
 
-/** Files are written under a generated uuid name, so an editor's file name never reaches the filesystem or a URL. */
 class HelpImageStorage
 {
 
-	public const MAX_SIZE = 4 * 1024 * 1024;
+	public const int MAX_SIZE = 4 * 1024 * 1024;
 
-	private const EXTENSIONS = [
+	private const array EXTENSIONS = [
 		'image/png' => 'png',
 		'image/jpeg' => 'jpg',
 		'image/webp' => 'webp',
 		'image/gif' => 'gif',
 	];
 
-	private const DIR = 'data/help/images';
+	private const string DIR = 'data/help/images';
 
 	public function __construct(
 		private readonly string $wwwDir,
@@ -40,11 +39,11 @@ class HelpImageStorage
 		$absolute = $this->absolutePath($relativePath);
 
 		$dir = dirname($absolute);
-		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) {
+		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) { // @ intentional
 			throw new RuntimeException(sprintf('Could not create directory: %s', $dir));
 		}
 
-		if (@file_put_contents($absolute, $bytes) === false) {
+		if (@file_put_contents($absolute, $bytes) === false) { // @ intentional
 			throw new RuntimeException(sprintf('Could not write help image: %s', $relativePath));
 		}
 
@@ -59,7 +58,7 @@ class HelpImageStorage
 
 		$absolute = $this->absolutePath($relativePath);
 		if (is_file($absolute)) {
-			@unlink($absolute);
+			@unlink($absolute); // @ intentional
 		}
 	}
 

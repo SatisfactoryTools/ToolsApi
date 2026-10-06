@@ -7,7 +7,6 @@ use Doctrine\ORM\Mapping as ORM;
 use greeny\SatisfactoryTools\Api\Model\Entities\Attributes\Identifier;
 use greeny\SatisfactoryTools\Api\Model\Entities\Attributes\Uuid;
 
-/** Articles reference images by uuid (`img:{uuid}` in Markdown), so the file can be re-uploaded without touching bodies. */
 #[ORM\Entity]
 #[ORM\Table(name: 'help_images')]
 #[ORM\HasLifecycleCallbacks]

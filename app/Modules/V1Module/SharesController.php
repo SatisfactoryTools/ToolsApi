@@ -22,10 +22,9 @@ use Ramsey\Uuid\Uuid;
 class SharesController extends BaseV1Controller
 {
 
-	private const TYPES = ['folder', 'plan'];
+	private const array TYPES = ['folder', 'plan'];
 
-	/** This is the only unauthenticated write storing caller-sent data, so it must be bounded; ShareService also caps the tree shape. */
-	private const BODY_MAX_BYTES = 1048576;
+	private const int BODY_MAX_BYTES = 1048576;
 
 	public function __construct(
 		private readonly ShareService $shareService,
@@ -36,7 +35,6 @@ class SharesController extends BaseV1Controller
 	{
 	}
 
-	/** Sharing a client-sent `root` tree needs no account because a signed-out user's plans live only in their browser. */
 	#[Path('/')]
 	#[Method('POST')]
 	public function create(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -129,7 +127,7 @@ class SharesController extends BaseV1Controller
 		]);
 	}
 
-	// The /visited endpoints must stay declared above get(): the router matches in declaration order and /{uuid} would otherwise swallow them.
+	// Must stay declared above get(): routes match in declaration order and /{uuid} would swallow /visited.
 	#[Path('/visited')]
 	#[Method('GET')]
 	public function visitedList(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -188,7 +186,6 @@ class SharesController extends BaseV1Controller
 		return $response->withStatus(IResponse::S204_NoContent);
 	}
 
-	/** Public by design: anyone with the link can view the share. */
 	#[Path('/{uuid}')]
 	#[Method('GET')]
 	#[RequestParameter(name: 'uuid', type: 'string', in: EndpointParameter::IN_PATH)]

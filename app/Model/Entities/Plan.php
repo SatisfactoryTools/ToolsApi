@@ -42,7 +42,7 @@ class Plan
 	#[ORM\Column]
 	public int $revision = 0;
 
-	/** Defaults to true (also for older plans): plan URLs are unguessable UUIDs and people hand them out expecting the recipient to see the plan. */
+	/** Defaults to true: people hand out plan URLs expecting the recipient to see the plan. */
 	#[ORM\Column(options: ['default' => true])]
 	public bool $linkAccess = true;
 

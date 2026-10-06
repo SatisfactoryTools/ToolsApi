@@ -16,33 +16,13 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-/**
- * Copies the shared production lines of the old Satisfactory Tools API (table `shared`:
- * slug + JSON document) into `legacy_share`, so the old links keep working through
- * GET /v1/legacy-shares/{slug} once the old API is retired.
- *
- * Idempotent: rows are upserted by slug and a row whose data already matches is left
- * alone, so the command can be re-run (e.g. once more right before the old API goes
- * offline) to pick up shares created in between. Two sources are supported:
- *
- *   --dsn="mysql:host=127.0.0.1;dbname=satisfactorytools" --user=... --password=...
- *       reads the old database directly over PDO, in id-ordered batches.
- *
- *   --file=/path/to/shared.jsonl
- *       reads a dump with one {"slug": "...", "data": "..."} object per line, where data
- *       is the raw JSON string as stored (see the --file option help for how to make it).
- *
- * Either way the rows stream through in batches (default 500) and the EntityManager is
- * cleared after each one, so memory stays flat whatever the table size.
- */
 #[AsCommand(name: 'legacy-shares:import', description: 'Imports shared production lines from the old Satisfactory Tools API into legacy_share')]
 class ImportLegacySharesCommand extends Command
 {
 
-	private const DEFAULT_BATCH_SIZE = 500;
+	private const int DEFAULT_BATCH_SIZE = 500;
 
-	/** Same rule as LegacySharesController — a slug that can never be served is invalid. */
-	private const SLUG_PATTERN = '~^[A-Za-z0-9]{1,64}$~D';
+	private const string SLUG_PATTERN = '~^[A-Za-z0-9]{1,64}$~D';
 
 	private int $imported = 0;
 
@@ -129,7 +109,6 @@ class ImportLegacySharesCommand extends Command
 					continue;
 				}
 
-				// Last occurrence of a slug wins, like a sequence of upserts would.
 				$batch[$slug] = $data;
 				if (count($batch) >= $batchSize) {
 					$this->importBatch($batch);
@@ -161,13 +140,7 @@ class ImportLegacySharesCommand extends Command
 		return Command::SUCCESS;
 	}
 
-	/**
-	 * Streams `shared` rows out of the old database, ordered by id and fetched a batch at a
-	 * time (keyset pagination — no OFFSET, so late pages cost no more than early ones and
-	 * the connection never holds an open cursor over the whole table).
-	 *
-	 * @return iterable<array{slug: mixed, data: mixed}>
-	 */
+	/** @return iterable<array{slug: mixed, data: mixed}> */
 	private function readDatabase(string $dsn, string $user, string $password, int $batchSize): iterable
 	{
 		if (str_starts_with($dsn, 'mysql:') && !str_contains($dsn, 'charset=')) {
@@ -196,15 +169,10 @@ class ImportLegacySharesCommand extends Command
 		} while ($count === $batchSize);
 	}
 
-	/**
-	 * Streams a JSON Lines dump line by line. Blank lines are ignored; a line that is not
-	 * a JSON object yields a row with no slug, which is then counted as invalid.
-	 *
-	 * @return iterable<array{slug: mixed, data: mixed}>
-	 */
+	/** @return iterable<array{slug: mixed, data: mixed}> */
 	private function readFile(string $file): iterable
 	{
-		$handle = @fopen($file, 'r');
+		$handle = @fopen($file, 'r'); // @ intentional
 		if ($handle === false) {
 			throw new \RuntimeException(sprintf('Could not open file: %s', $file));
 		}
@@ -236,7 +204,6 @@ class ImportLegacySharesCommand extends Command
 		return is_string($slug) && preg_match(self::SLUG_PATTERN, $slug) === 1 ? $slug : null;
 	}
 
-	/** The raw string is kept verbatim; it only has to decode to a JSON object. */
 	private function validData(mixed $data): ?string
 	{
 		if (!is_string($data)) {
@@ -252,12 +219,7 @@ class ImportLegacySharesCommand extends Command
 		return is_array($decoded) ? $data : null;
 	}
 
-	/**
-	 * Upserts one batch: a single lookup of the existing rows, then insert / update /
-	 * skip per slug, one flush, and a clear so nothing from this batch stays managed.
-	 *
-	 * @param array<string, string> $batch slug => raw data
-	 */
+	/** @param array<string, string> $batch */
 	private function importBatch(array $batch): void
 	{
 		$existing = $this->legacyShareRepository->getBySlugs(array_keys($batch));

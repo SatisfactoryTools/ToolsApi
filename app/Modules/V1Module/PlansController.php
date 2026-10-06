@@ -378,7 +378,7 @@ class PlansController extends BaseV1Controller
 
 	private function getVersion(ApiRequest $request): ?Version
 	{
-		// Any version is addressable by UUID (the UUID acts as a capability); the plans and folders themselves are still scoped to the user.
+		// Not scoped to the user on purpose: any version is addressable by UUID.
 		return $this->versionRepository->getByUuid(
 			(string) $this->getUuidParameter($request, 'version'),
 		);

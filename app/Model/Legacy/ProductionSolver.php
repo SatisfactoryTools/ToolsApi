@@ -7,46 +7,24 @@ use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\DocsSchema;
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\Recipe;
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Request\ProductionRequest;
 
-/**
- * Builds the old tools' LP model for a production request and solves it. Ported from the
- * old API (app/Solver/ProductionSolver.php, the one POST /v2/solver ran) with the algorithm
- * and the generated model text kept as they were — static state became instance state and
- * LPSolver is injected, nothing else changed. Column names in the result are the old ones:
- * `Recipe_X_C@100#Desc_Machine_C`, `Desc_X_C#Mine`, `Desc_X_C#Product`, `Desc_X_C#Byproduct`,
- * `Desc_X_C#Input` and the pseudo items `special__*`.
- */
 class ProductionSolver
 {
 
-	private const TYPE_PER_MINUTE = 'perMinute';
-	private const TYPE_MAX = 'max';
+	private const string TYPE_PER_MINUTE = 'perMinute';
+	private const string TYPE_MAX = 'max';
 
-	private const SPECIAL_POWER = 'special__power';
-	private const SPECIAL_SINK_POINTS = 'special__points';
-	private const SPECIAL_BUILDING_COUNT = 'special__buildings';
+	private const string SPECIAL_POWER = 'special__power';
+	private const string SPECIAL_SINK_POINTS = 'special__points';
+	private const string SPECIAL_BUILDING_COUNT = 'special__buildings';
 
-	/**
-	 * [
-	 *      'Desc_IronOre_C' => ['Recipe_IronIngot_C' => 3, ...],
-	 *      'Desc_CopperOre_C' => ['Recipe_CopperIngot_C' => 2, ...],
-	 *      ...
-	 * ]
-	 *
-	 * @var array<string, array<string, float>>
-	 */
+	/** @var array<string, array<string, float>> */
 	private array $rawItems = [];
 
 	public function __construct(private readonly LPSolver $lpSolver)
 	{
 	}
 
-	/**
-	 * The request must carry a `resourceMax` and `resourceWeight` entry for every resource
-	 * of the schema (LegacyRequestFactory fills the gaps).
-	 *
-	 * @return array{variables: array<string, string>, recipes: array<string, string>}|null null when there is no solution
-	 * @throws LegacySolverException
-	 */
+	/** @return array{variables: array<string, string>, recipes: array<string, string>}|null */
 	public function solveRequest(ProductionRequest $request, DocsSchema $schema): ?array
 	{
 		$this->rawItems = [];
@@ -75,8 +53,7 @@ class ProductionSolver
 			}
 		}
 
-		// The old solver had sinking disabled (its addSinkableResource call was commented
-		// out), so sinkableResources is accepted but has no effect — kept that way on purpose.
+		// The old solver had sinking disabled, so sinkableResources is intentionally ignored.
 
 		foreach ($schema->resources as $resource) {
 			if (!in_array($resource, $request->blockedResources, true)) {

@@ -22,10 +22,7 @@ abstract class BaseController implements IController
 		return $this->parseBodyString((string) $request->getBody());
 	}
 
-	/**
-	 * For callers that already hold the raw body (e.g. to measure it before decoding), since the request stream is only worth reading once.
-	 * @return array<string, mixed>
-	 */
+	/** @return array<string, mixed> */
 	protected function parseBodyString(string $body): array
 	{
 		if ($body === '') {

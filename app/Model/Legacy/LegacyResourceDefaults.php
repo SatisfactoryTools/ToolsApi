@@ -2,22 +2,14 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Legacy;
 
-/**
- * What the old client put into a request when the user had not touched the resource
- * settings (satisfactorytools: src/Data/Data.ts, `resourceAmounts` / `resourceWeights`).
- * The old API crashed on a request missing a resource key; the legacy solver endpoint
- * fills the gaps with these instead — a resource the old client did not know gets no
- * limit and no weight. The limits are not just cosmetic: with every resource unbounded
- * (MAX_SAFE_INTEGER on all of them) lp_solve loses accuracy on a `max` request and
- * reports no solution, with the old client's finite limits it solves.
- */
+// Finite limits are required: with every resource unbounded lp_solve finds no solution for `max` requests.
 class LegacyResourceDefaults
 {
 
 	/** The old client's "no limit" (JavaScript's Number.MAX_SAFE_INTEGER, sent for water). */
-	public const UNLIMITED = 9007199254740991;
+	public const int UNLIMITED = 9007199254740991;
 
-	private const LIMITS_0_8 = [
+	private const array LIMITS_0_8 = [
 		'Desc_OreIron_C' => 70380,
 		'Desc_OreCopper_C' => 28860,
 		'Desc_Stone_C' => 52860,
@@ -33,7 +25,7 @@ class LegacyResourceDefaults
 		'Desc_Water_C' => self::UNLIMITED,
 	];
 
-	private const LIMITS_1_0 = [
+	private const array LIMITS_1_0 = [
 		'Desc_OreIron_C' => 92100,
 		'Desc_OreCopper_C' => 36900,
 		'Desc_Stone_C' => 69900,
@@ -49,7 +41,7 @@ class LegacyResourceDefaults
 		'Desc_Water_C' => self::UNLIMITED,
 	];
 
-	private const WEIGHTS_0_8 = [
+	private const array WEIGHTS_0_8 = [
 		'Desc_OreIron_C' => 1,
 		'Desc_OreCopper_C' => 2.438669438669439,
 		'Desc_Stone_C' => 1.3314415437003406,
@@ -65,7 +57,7 @@ class LegacyResourceDefaults
 		'Desc_Water_C' => 0,
 	];
 
-	private const WEIGHTS_1_0 = [
+	private const array WEIGHTS_1_0 = [
 		'Desc_OreIron_C' => 1,
 		'Desc_OreCopper_C' => 2.4959349593495936,
 		'Desc_Stone_C' => 1.3175965665236051,

@@ -140,7 +140,6 @@ class AuthService
 		$this->userRepository->save($resetToken->user, flush: false);
 		$this->passwordResetTokenRepository->save($resetToken);
 
-		// If the account was compromised, this logs the attacker out everywhere.
 		$this->refreshTokenRepository->deleteAllForUser($resetToken->user);
 	}
 

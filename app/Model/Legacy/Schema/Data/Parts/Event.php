@@ -2,7 +2,6 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\Parts;
 
-/** Ported from the old API (app/Solver/Schema/Data/Parts/Event.php). */
 enum Event: string
 {
 

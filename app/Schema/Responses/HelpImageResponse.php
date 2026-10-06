@@ -10,7 +10,6 @@ class HelpImageResponse
 	public function __construct(
 		public readonly string $id,
 		public readonly string $fileName,
-		/** Web-root-relative path; the frontend resolves it against the API base URL. */
 		public readonly string $path,
 		public readonly string $uploadedAt,
 	)

@@ -24,14 +24,13 @@ use greeny\SatisfactoryTools\Api\Schema\Responses\HelpImageResponse;
 use Nette\Http\IResponse;
 use Ramsey\Uuid\Uuid;
 
-/** Readers normally load the static snapshot HelpSnapshotService writes after every change; the public endpoints here are only a fallback. */
 #[Path('/help')]
 class HelpController extends BaseV1Controller
 {
 
-	private const SLUG_PATTERN = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
+	private const string SLUG_PATTERN = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 
-	private const TOPIC_PATTERN = '/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/';
+	private const string TOPIC_PATTERN = '/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/';
 
 	public function __construct(
 		private readonly HelpArticleRepository $articleRepository,
@@ -251,7 +250,6 @@ class HelpController extends BaseV1Controller
 			return $this->notFound($response, 'Category not found');
 		}
 
-		// Articles survive (join column is SET NULL) and show up under "Other".
 		$this->categoryRepository->delete($category);
 		$this->snapshotService->rebuild();
 
@@ -283,7 +281,6 @@ class HelpController extends BaseV1Controller
 
 		$body = $this->parseBody($request);
 		$encoded = (string) ($body['data'] ?? '');
-		// Data URLs arrive as "data:image/png;base64,iVBOR..." - keep only the payload.
 		$encoded = preg_replace('/^data:[^,]*,/', '', $encoded) ?? $encoded;
 		$bytes = base64_decode($encoded, true);
 		if ($bytes === false || $bytes === '') {
@@ -331,7 +328,6 @@ class HelpController extends BaseV1Controller
 		return $response->withStatus(IResponse::S204_NoContent);
 	}
 
-	/** Manual rebuild, e.g. after editing the database directly. */
 	#[Path('/editor/publish')]
 	#[Method('POST')]
 	public function publish(ApiRequest $request, ApiResponse $response): ApiResponse
@@ -346,7 +342,6 @@ class HelpController extends BaseV1Controller
 	}
 
 	/**
-	 * Returns a callable writing the error response so create and update report errors identically.
 	 * @param array<string, mixed> $body
 	 * @return (callable(ApiResponse): ApiResponse)|null
 	 */
@@ -400,7 +395,7 @@ class HelpController extends BaseV1Controller
 			if ($seeAlso === null) {
 				return fn (ApiResponse $response): ApiResponse => $this->badRequest($response, 'Field seeAlso must be a list of article slugs');
 			}
-			// Unknown slugs are allowed: the target may still be in progress, and the reader skips whatever is not in the manifest.
+			// Unknown slugs are allowed: the target article may not be written yet.
 			$article->seeAlso = $seeAlso;
 		}
 
@@ -481,10 +476,7 @@ class HelpController extends BaseV1Controller
 		return null;
 	}
 
-	/**
-	 * A topic must resolve to exactly one article, or a help button would not know where to go.
-	 * @param array<string, string> $topics
-	 */
+	/** @param array<string, string> $topics */
 	private function claimedTopic(array $topics, HelpArticle $article): ?string
 	{
 		foreach ($this->articleRepository->getAll() as $other) {
@@ -522,7 +514,7 @@ class HelpController extends BaseV1Controller
 		return array_values(array_unique($list));
 	}
 
-	/** @return array<string, string>|null topic id => anchor (without '#') */
+	/** @return array<string, string>|null */
 	private function topicMap(mixed $value): ?array
 	{
 		if (!is_array($value)) {
@@ -562,7 +554,7 @@ class HelpController extends BaseV1Controller
 		return $response->withStatus(IResponse::S404_NotFound)->writeJsonBody(['error' => $message]);
 	}
 
-	/** Deliberately 403 for signed-out users too: the editor is not advertised. */
+	// Deliberately 403 for signed-out users too: the editor is not advertised.
 	private function forbidden(ApiResponse $response): ApiResponse
 	{
 		return $response->withStatus(IResponse::S403_Forbidden)->writeJsonBody(['error' => 'Forbidden']);

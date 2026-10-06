@@ -10,11 +10,10 @@ use greeny\SatisfactoryTools\Api\Utils\MarkdownSections;
 use JsonException;
 use RuntimeException;
 
-/** Writes the static help files served from the web root (data/help/index.json manifest, data/help/articles/{slug}.json per article); the DB stays the source of truth. The whole snapshot is rebuilt on every write to keep cross-article data (see-also, category membership, topic map) consistent. */
 class HelpSnapshotService
 {
 
-	private const DIR = 'data/help';
+	private const string DIR = 'data/help';
 
 	public function __construct(
 		private readonly HelpArticleRepository $articleRepository,
@@ -46,7 +45,6 @@ class HelpSnapshotService
 	}
 
 	/**
-	 * Also served by `GET /v1/help` as a fallback when the snapshot has not been generated yet.
 	 * @param HelpArticle[] $articles
 	 * @return array<string, mixed>
 	 */
@@ -114,14 +112,14 @@ class HelpSnapshotService
 		];
 	}
 
-	/** Serializes rebuilds so concurrent saves don't interleave writes. The lock file is never unlinked - that would reintroduce the race. */
+	/** The lock file is never unlinked - that would reintroduce the race. */
 	private function withLock(callable $callback): void
 	{
-		if (!is_dir($this->lockDir) && !@mkdir($this->lockDir, 0o775, true) && !is_dir($this->lockDir)) {
+		if (!is_dir($this->lockDir) && !@mkdir($this->lockDir, 0o775, true) && !is_dir($this->lockDir)) { // @ intentional
 			throw new RuntimeException(sprintf('Could not create lock directory: %s', $this->lockDir));
 		}
 
-		$handle = @fopen($this->lockDir . '/help-snapshot.lock', 'c');
+		$handle = @fopen($this->lockDir . '/help-snapshot.lock', 'c'); // @ intentional
 		if ($handle === false || !flock($handle, LOCK_EX)) {
 			throw new RuntimeException('Could not acquire the help snapshot lock');
 		}
@@ -140,7 +138,7 @@ class HelpSnapshotService
 		$kept = array_flip($keptSlugs);
 		foreach (glob($this->absolutePath(self::DIR . '/articles') . '/*.json') ?: [] as $file) {
 			if (!isset($kept[basename($file, '.json')])) {
-				@unlink($file);
+				@unlink($file); // @ intentional
 			}
 		}
 	}
@@ -151,7 +149,7 @@ class HelpSnapshotService
 		$absolute = $this->absolutePath($relativePath);
 
 		$dir = dirname($absolute);
-		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) {
+		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) { // @ intentional
 			throw new RuntimeException(sprintf('Could not create directory: %s', $dir));
 		}
 
@@ -163,8 +161,8 @@ class HelpSnapshotService
 
 		// Write-then-rename, so a reader never sees a half-written file.
 		$tmp = $absolute . '.tmp';
-		if (@file_put_contents($tmp, $json) === false || !@rename($tmp, $absolute)) {
-			@unlink($tmp);
+		if (@file_put_contents($tmp, $json) === false || !@rename($tmp, $absolute)) { // @ intentional
+			@unlink($tmp); // @ intentional
 			throw new RuntimeException(sprintf('Could not write help file: %s', $relativePath));
 		}
 	}

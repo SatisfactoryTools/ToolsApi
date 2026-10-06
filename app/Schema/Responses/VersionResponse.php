@@ -11,7 +11,7 @@ class VersionResponse extends ArrayableResponse
 {
 
 	/**
-	 * @param string[] $mods mod version UUIDs in application order
+	 * @param string[] $mods
 	 * @param array<string, mixed>|null $worldData
 	 */
 	public function __construct(

@@ -2,11 +2,6 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Legacy;
 
-/**
- * What POST /v2/solver of the old API did (SolverBeta::solve): load the game data for the
- * requested version, run ProductionSolver, hand back the recipe columns — here with the
- * values as floats rather than the strings the old API returned.
- */
 class LegacySolverService
 {
 
@@ -19,9 +14,8 @@ class LegacySolverService
 	}
 
 	/**
-	 * @param array<string, mixed> $request the old tools' request document
-	 * @return array<string, float> column => value; empty when there is no solution
-	 * @throws LegacySolverException
+	 * @param array<string, mixed> $request
+	 * @return array<string, float>
 	 */
 	public function solve(string $gameVersion, array $request): array
 	{

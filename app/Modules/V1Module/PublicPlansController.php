@@ -19,7 +19,6 @@ class PublicPlansController extends BaseV1Controller
 	{
 	}
 
-	/** No authentication, the UUID is the capability. 404 covers both "no such plan" and "link access off", so a private plan's existence is never confirmed. */
 	#[Path('/{uuid}')]
 	#[Method('GET')]
 	#[RequestParameter(name: 'uuid', type: 'string', in: EndpointParameter::IN_PATH)]

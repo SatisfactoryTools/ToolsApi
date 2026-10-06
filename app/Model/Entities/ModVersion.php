@@ -19,11 +19,9 @@ class ModVersion
 	#[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
 	public Mod $mod;
 
-	/** Need not match any game version. */
 	#[ORM\Column(length: 255)]
 	public string $name;
 
-	/** Same format as a game version data file; null until the author uploads data, in which case nothing is merged. */
 	#[ORM\Column(nullable: true)]
 	public ?string $dataPath = null;
 

@@ -16,8 +16,7 @@ use Nette\Utils\Random;
 class OAuthService
 {
 
-	/** Seconds a completed desktop flow stays pollable, even past the state's TTL. */
-	private const DESKTOP_RESULT_GRACE = 60;
+	private const int DESKTOP_RESULT_GRACE = 60;
 
 	public function __construct(
 		private readonly OAuthProviderRegistry $registry,
@@ -42,16 +41,7 @@ class OAuthService
 		return $this->registry->has($providerKey);
 	}
 
-	/**
-	 * Begin an authorization flow. When $linkUser is set the flow links the provider to
-	 * that already-authenticated user rather than logging in / signing up.
-	 *
-	 * A $desktop flow also gets a poll token: the desktop app opens the authorization URL
-	 * in the system browser, whose callback cannot reach the app, so the app polls
-	 * /desktop/poll (findDesktopState()) with the state and this token for the outcome instead.
-	 *
-	 * @return array{authorizationUrl: string, state: string, pollToken?: string}
-	 */
+	/** @return array{authorizationUrl: string, state: string, pollToken?: string} */
 	public function start(string $providerKey, ?User $linkUser = null, bool $desktop = false): array
 	{
 		$provider = $this->registry->get($providerKey);
@@ -77,17 +67,7 @@ class OAuthService
 		return $result;
 	}
 
-	/**
-	 * Validate the provider callback and either authenticate (login/signup) or link.
-	 *
-	 * For a desktop flow the state row is kept rather than consumed and the result carries
-	 * it (OAuthCallbackResult::$desktopState): the caller stores the response body with
-	 * completeDesktop(). A failed exchange is stored as `{"error": ...}` here before the
-	 * exception is rethrown, so the polling app learns about it too.
-	 *
-	 * @param array<string, mixed> $params the query parameters the provider sent to the callback
-	 * @throws OAuthException
-	 */
+	/** @param array<string, mixed> $params */
 	public function handleCallback(string $providerKey, array $params): OAuthCallbackResult
 	{
 		$provider = $this->registry->get($providerKey);
@@ -99,8 +79,7 @@ class OAuthService
 
 		$state = $this->stateRepository->getByState($stateValue);
 		if ($state !== null && $state->completedAt !== null) {
-			// A finished desktop flow waiting for its poll: refuse a second callback, but
-			// leave the stored result for the app to collect.
+			// A finished desktop flow: refuse a second callback, but keep the stored result for the poll.
 			throw new OAuthException('Invalid or expired OAuth state');
 		}
 		if ($state === null || $state->provider !== $providerKey || $state->expiresAt < new DateTimeImmutable()) {
@@ -127,12 +106,7 @@ class OAuthService
 		}
 	}
 
-	/**
-	 * Records the outcome of a desktop flow's callback for the app to poll. Single-use:
-	 * handleCallback() refuses a state that has completed.
-	 *
-	 * @param array<string, mixed> $result the response body the callback would have returned
-	 */
+	/** @param array<string, mixed> $result */
 	public function completeDesktop(OAuthState $state, array $result): void
 	{
 		$now = new DateTimeImmutable();
@@ -146,10 +120,6 @@ class OAuthService
 		$this->stateRepository->save($state);
 	}
 
-	/**
-	 * Looks up a desktop flow for the app's poll. Null when the state is unknown, expired,
-	 * not a desktop flow or the token does not match - the caller cannot tell these apart.
-	 */
 	public function findDesktopState(string $stateValue, string $pollToken): ?OAuthState
 	{
 		if ($stateValue === '' || $pollToken === '') {
@@ -169,12 +139,7 @@ class OAuthService
 		return $state;
 	}
 
-	/**
-	 * Hands a completed desktop flow's stored result over and deletes the state, so the
-	 * tokens in it can be collected only once.
-	 *
-	 * @return array<string, mixed>
-	 */
+	/** @return array<string, mixed> */
 	public function consumeDesktopResult(OAuthState $state): array
 	{
 		$result = $state->result ?? ['error' => 'Sign-in failed'];
@@ -224,10 +189,7 @@ class OAuthService
 		$this->identityRepository->delete($identity);
 	}
 
-	/**
-	 * @param array<string, mixed> $params
-	 * @throws OAuthException
-	 */
+	/** @param array<string, mixed> $params */
 	private function exchange(OAuthProviderInterface $provider, string $providerKey, array $params, ?User $linkUser): OAuthCallbackResult
 	{
 		$info = $provider->fetchUserInfo($params, $this->redirectUriFor($providerKey));
@@ -237,7 +199,6 @@ class OAuthService
 			: $this->loginOrSignup($providerKey, $info);
 	}
 
-	/** @throws OAuthException */
 	private function link(User $user, string $providerKey, OAuthUserInfo $info): OAuthCallbackResult
 	{
 		$existing = $this->identityRepository->getByProviderAccount($providerKey, $info->providerUserId);
@@ -272,7 +233,6 @@ class OAuthService
 			);
 		}
 
-		// No identity yet — matching and account creation both require an email.
 		if ($info->email === null) {
 			throw new OAuthException(
 				ucfirst($providerKey) . ' does not provide an email address, so it cannot be used to sign up. '

@@ -2,14 +2,11 @@
 
 namespace greeny\SatisfactoryTools\Api\Utils;
 
-/** The anchor algorithm is mirrored by HelpMarkdownRenderer in the frontend - ids must match, or deep links break. */
+/** Mirrored by HelpMarkdownRenderer in the frontend - anchor ids must match, or deep links break. */
 class MarkdownSections
 {
 
-	/**
-	 * Level 1 is skipped, it's the article title which the reader renders itself.
-	 * @return array<int, array{id: string, title: string, level: int}>
-	 */
+	/** @return array<int, array{id: string, title: string, level: int}> */
 	public static function extract(string $markdown): array
 	{
 		$sections = [];
@@ -31,7 +28,6 @@ class MarkdownSections
 				continue;
 			}
 
-			// Two headings with the same text get -2, -3… suffixes, like GitHub.
 			$used[$id] = ($used[$id] ?? 0) + 1;
 			if ($used[$id] > 1) {
 				$id .= '-' . $used[$id];

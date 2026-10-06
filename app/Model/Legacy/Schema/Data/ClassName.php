@@ -2,7 +2,6 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data;
 
-/** Ported from the old API (app/Solver/Schema/Data/ClassName.php). */
 trait ClassName
 {
 

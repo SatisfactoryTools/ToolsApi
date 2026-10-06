@@ -6,7 +6,6 @@ use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\Parts\BuildingMaterial
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\Parts\Fuel;
 use greeny\SatisfactoryTools\Api\Model\Legacy\Schema\Data\Parts\ItemForm;
 
-/** Ported from the old API (app/Solver/Schema/Data/Building.php); the property list drives the schema. */
 class Building
 {
 

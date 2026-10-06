@@ -4,7 +4,6 @@ namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
 use JsonException;
 
-/** Dependency-free cURL helpers, so the project does not need an HTTP client. */
 abstract class AbstractOAuthProvider implements OAuthProviderInterface
 {
 

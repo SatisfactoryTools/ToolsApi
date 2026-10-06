@@ -22,7 +22,7 @@ class ModDataStorage
 		$absolute = $this->absolutePath($relativePath);
 
 		$dir = dirname($absolute);
-		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) {
+		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) { // @ intentional
 			throw new RuntimeException(sprintf('Could not create directory: %s', $dir));
 		}
 
@@ -32,7 +32,7 @@ class ModDataStorage
 			throw new RuntimeException('Could not encode mod data', 0, $e);
 		}
 
-		if (@file_put_contents($absolute, $json) === false) {
+		if (@file_put_contents($absolute, $json) === false) { // @ intentional
 			throw new RuntimeException(sprintf('Could not write mod data file: %s', $relativePath));
 		}
 
@@ -47,7 +47,7 @@ class ModDataStorage
 
 		$absolute = $this->absolutePath($relativePath);
 		if (is_file($absolute)) {
-			@unlink($absolute);
+			@unlink($absolute); // @ intentional
 		}
 	}
 

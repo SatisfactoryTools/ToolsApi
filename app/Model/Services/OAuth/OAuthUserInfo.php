@@ -2,7 +2,6 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
-/** Nickname and avatar are display only, never used for matching. */
 class OAuthUserInfo
 {
 

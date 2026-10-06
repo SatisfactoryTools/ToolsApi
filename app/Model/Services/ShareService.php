@@ -13,19 +13,18 @@ use greeny\SatisfactoryTools\Api\Model\Repositories\ShareRepository;
 use JsonException;
 use Ramsey\Uuid\Uuid;
 
-/** Shares freeze the whole subtree into a JSON snapshot, so later edits to the originals never reach link holders. Only shareTree() input needs validating, since it is reachable without an account. */
 class ShareService
 {
 
-	/** The frontend mirrors this for the anonymous localStorage list; keep the two in sync. */
-	public const VISITED_CAP = 20;
+	/** The frontend mirrors this for the anonymous localStorage list; keep in sync. */
+	public const int VISITED_CAP = 20;
 
-	/** Bound the tree shape for the unauthenticated POST /v1/shares; the raw body size is capped separately by the controller. */
-	public const TREE_MAX_NODES = 500;
-	public const TREE_MAX_DEPTH = 32;
+	/** Bounds the tree for the unauthenticated POST /v1/shares; body size is capped separately by the controller. */
+	public const int TREE_MAX_NODES = 500;
+	public const int TREE_MAX_DEPTH = 32;
 
 	/** Matches the column length of owned folders/plans. */
-	private const NAME_MAX_LENGTH = 255;
+	private const int NAME_MAX_LENGTH = 255;
 
 	public function __construct(
 		private readonly PlanTreeBuilder $treeBuilder,
@@ -49,7 +48,6 @@ class ShareService
 		return $this->persist($user, 'plan', $version, $this->treeBuilder->planNode($plan, $index));
 	}
 
-	/** Freezes a client-sent tree (plans that live only in the browser). Node shape mirrors GET /v1/shares/{uuid}; node ids are optional and generated when missing. */
 	public function shareTree(?User $user, Version $version, string $type, mixed $root): Share
 	{
 		$createdAt = new DateTimeImmutable();
@@ -113,8 +111,7 @@ class ShareService
 		return ['shares' => $shares];
 	}
 
-	/** Mirrors the frontend's icon rule (an explicit null iconClassName means no icon), so the visited list can carry icons without fetching every share. * Link previews of shared plans (MetaResolver) use it too.
-	 */
+	/** Mirrors the frontend's icon rule; keep in sync. */
 	public function resolvePlanIcon(mixed $data): ?string
 	{
 		if (!is_string($data)) {
@@ -205,7 +202,6 @@ class ShareService
 		} elseif (!is_string($id) || !Uuid::isValid($id)) {
 			throw new ShareInputException(sprintf('Field %s.id must be a UUID or be left out', $path));
 		} else {
-			// Normalizes the spelling (case, braces) the client used.
 			$id = Uuid::fromString($id)->toString();
 		}
 
@@ -218,7 +214,6 @@ class ShareService
 			throw new ShareInputException(sprintf('Field %s.name may be at most %d characters long', $path, self::NAME_MAX_LENGTH));
 		}
 
-		// Opaque JSON string stored verbatim, exactly like the owned path stores $plan->data.
 		$data = $input['data'] ?? '{}';
 		if (!is_string($data)) {
 			throw new ShareInputException(sprintf('Field %s.data must be a JSON string', $path));
