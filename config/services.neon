@@ -43,6 +43,23 @@ services:
 
 	- greeny\SatisfactoryTools\Api\Model\Services\ShareService
 
+	- greeny\SatisfactoryTools\Api\Model\Services\LegacyShareFetcher(sourceUrl: %legacyShareSourceUrl%)
+
+	- greeny\SatisfactoryTools\Api\Model\Legacy\LegacyGameDataLoader(dataDir: %appDir%/../data/legacy)
+
+	- greeny\SatisfactoryTools\Api\Model\Legacy\LPSolver(
+		lpSolveBin: %legacySolver.lpSolveBin%,
+		timeout: %legacySolver.timeout%
+	)
+
+	- greeny\SatisfactoryTools\Api\Model\Legacy\ProductionSolver
+
+	- greeny\SatisfactoryTools\Api\Model\Legacy\LegacyResourceDefaults
+
+	- greeny\SatisfactoryTools\Api\Model\Legacy\LegacyRequestFactory
+
+	- greeny\SatisfactoryTools\Api\Model\Legacy\LegacySolverService
+
 	worldDataService:
 		factory: greeny\SatisfactoryTools\Api\Model\Services\WorldDataService(
 			generatorBin: %worldData.generatorBin%,

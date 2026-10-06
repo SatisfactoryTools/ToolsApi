@@ -6,6 +6,18 @@ parameters:
 	# Not derived from the request: the caller is the frontend's index.php, not a browser.
 	publicApiUrl: 'https://api.new.satisfactorytools.com'
 
+	# Share endpoint of the old Satisfactory Tools API. GET /v1/legacy-shares/{slug} fetches
+	# {url}{slug}/ from there when the slug is not in legacy_share (or the table does not
+	# exist yet) and stores what it got. Empty string disables the fallback, e.g. once the
+	# old API is gone and the import has run.
+	legacyShareSourceUrl: 'https://api.satisfactorytools.com/v2/share/'
+
+	legacySolver:
+		# The old solver's LP engine (POST /v1/legacy-solver). An absolute path, so it is
+		# found whatever PATH the web server runs with.
+		lpSolveBin: '/usr/bin/lp_solve'
+		timeout: 30               # seconds before a calculation is aborted (504)
+
 	jwt:
 		secret: %jwtSecret%
 		accessTokenTtl: 3600      # 1 hour

@@ -34,7 +34,7 @@ jobs:
 
             -   name: Pack release
                 if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
-                run: tar -czf release.tar.gz app bin config vendor www composer.json composer.lock
+                run: tar -czf release.tar.gz app bin config data vendor www composer.json composer.lock
 
             -   name: Upload release artifact
                 if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
@@ -84,21 +84,25 @@ jobs:
 
             -   name: Upload new version
                 run: |
-                    # Everything but the runtime state: local config, logs, cache and generated data
-                    # stay on the server (--delete would otherwise wipe them), as do dot-files in
-                    # the deploy root (.git, .htaccess, ...). Anything else up there that is not in
-                    # the repository is deleted.
+                    # Everything but the runtime state: local config, logs, cache, generated data
+                    # and desktop releases (uploaded by the frontend's CI) stay on the server
+                    # (--delete would otherwise wipe them), as do dot-files in the deploy root
+                    # (.git, .htaccess, ...). Anything else up there that is not in the
+                    # repository is deleted.
                     rsync -az --delete \
                       --exclude='/maintenance.flag' \
                       --exclude='/config/local.neon' \
                       --exclude='/log/' \
                       --exclude='/temp/' \
                       --exclude='/www/data/' \
+                      --exclude='/www/desktop/' \
                       --exclude='/.*' \
                       release/ "deploy-target:$DEPLOY_PATH/"
                     # www/data holds generated data, so it is synced without --delete - this only
                     # refreshes the tracked .htaccess / .gitkeep files inside it.
                     rsync -az release/www/data/ "deploy-target:$DEPLOY_PATH/www/data/"
+                    # Same for www/desktop: the frontend's CI uploads desktop releases there.
+                    rsync -az release/www/desktop/ "deploy-target:$DEPLOY_PATH/www/desktop/"
 
             -   name: Clear cache
                 run: ssh deploy-target "mkdir -p '$DEPLOY_PATH/log' '$DEPLOY_PATH/temp' && rm -rf '$DEPLOY_PATH/temp/cache'"

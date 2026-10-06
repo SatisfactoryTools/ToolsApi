@@ -81,10 +81,10 @@ it writes; the server needs a PHP 8.5 CLI for the schema update. A deploy goes:
 6. `rm $DEPLOY_PATH/maintenance.flag` - the new version is live
 
 The rsync runs with `--delete`, so files on the server that are not in the repository are
-removed - except `config/local.neon`, `log/`, `temp/`, `www/data/` and dot-files in the
-deploy root, which hold state that only exists on the server. `www/data/` is synced
-separately without `--delete`, which refreshes the tracked `.htaccess` files inside it but
-leaves the generated data alone.
+removed - except `config/local.neon`, `log/`, `temp/`, `www/data/`, `www/desktop/` and
+dot-files in the deploy root, which hold state that only exists on the server. `www/data/`
+and `www/desktop/` are synced separately without `--delete`, which refreshes the tracked
+`.htaccess` files inside them but leaves the generated data and desktop releases alone.
 
 If a step fails, the flag stays in place and the API keeps returning 503 rather than
 serving a half-updated version; clear it by hand once the server is sorted out.
@@ -126,7 +126,8 @@ Endpoints (v1)
 
 - `POST /v1/auth/{register,login,refresh,logout,forgot-password,reset-password}`
 - `GET|POST /v1/auth/oauth/{providers,{provider}/start,{provider}/callback,connections}`,
-  `DELETE /v1/auth/oauth/{provider}` - third-party sign-in (Steam, Discord, GitHub, Google)
+  `DELETE /v1/auth/oauth/{provider}` - third-party sign-in (Steam, Discord, GitHub, Google);
+  `POST /v1/auth/oauth/desktop/poll` - the desktop app's poll (see "Desktop sign-in" below)
 - `GET|PUT /v1/account` - the signed-in user's profile (resolved greeting name, provider
   nicknames/avatars) and their self-chosen display name (see docs/account-and-plan-counts.md)
 - `GET|POST /v1/versions` - list / create custom game versions
@@ -152,11 +153,56 @@ Endpoints (v1)
   visited-shares list (capped at 20 entries; see docs/shared-plans-api.md)
 - `GET /v1/legacy-shares/{slug}` - a production line shared through the old
   satisfactorytools.com (public, no auth; see "Legacy shares" below)
+- `POST /v1/legacy-solver` - the old tools' production solver, for calculating imported old
+  production lines exactly as the old site did (public, no auth; see "Legacy solver" below)
 - `GET /v1/meta?path={frontend path}` - link preview metadata (title, description, image)
   of a frontend page, for the frontend's `index.php` to print into `<head>`. Public, always
   200 (defaults for anything unknown). Codex lookups use a per-version index kept in
   `temp/cache`; image URLs are built from the `publicApiUrl` parameter. Text rules are
   tested by `php tests/MetaTextTest.php`.
+
+Desktop sign-in
+---------------
+
+The desktop (Tauri) app cannot receive a provider's redirect - it lands on the web
+frontend's `{oauthCallbackBaseUrl}/{provider}` page in the user's system browser - so it
+signs in by polling:
+
+1. The app calls `POST /v1/auth/oauth/{provider}/start` with `{"desktop": true}` (plus its
+   Bearer token to link a provider). The response carries a `pollToken` next to
+   `authorizationUrl` and `state`; the app opens `authorizationUrl` in the system browser.
+2. The browser finishes on the web frontend, which posts `/callback` as usual. For a
+   desktop state the API does not hand out tokens there: it keeps the response body it
+   would have sent (tokens + `provider`, or the linked payload; `{"error": ...}` when the
+   exchange failed) on the `oauth_state` row and answers the browser with
+   `{"desktop": true, "provider": "...", "linked": false}` so the page can tell the user to
+   go back to the app. A failed exchange still answers `400` there. The state is
+   single-use: a second callback gets `Invalid or expired OAuth state`.
+3. Meanwhile the app polls `POST /v1/auth/oauth/desktop/poll` with
+   `{"state": "...", "pollToken": "..."}` (no auth): `202 {"pending": true}` until the
+   browser is done, then the stored body once - `200`, or `400 {"error": ...}` - and the
+   row is deleted. An unknown, expired or non-desktop state or a wrong token gets
+   `404 {"error": "Unknown or expired sign-in"}`.
+
+The state lives for `oauth.stateTtl` seconds from `/start` (`config/common.neon`); a result
+that lands near the end stays pollable for at least another 60 seconds.
+
+Desktop releases
+----------------
+
+The frontend repository's CI publishes the desktop app into `www/desktop/` on this server
+(this repository only tracks `www/desktop/.htaccess`; deploys never delete anything else
+there):
+
+```
+www/desktop/latest.json               updater manifest   https://{api host}/desktop/latest.json
+www/desktop/{version}/{file}          installers, update bundles and their .sig files
+```
+
+Apache serves them as static files (the front controller only takes paths that are not
+existing files), with `Access-Control-Allow-Origin: *`, no directory listings, installers as
+`application/octet-stream` and `Cache-Control: no-cache` on `latest.json`, so clients always
+revalidate the manifest. Stale versions are not pruned automatically.
 
 Help articles
 -------------
@@ -191,7 +237,27 @@ into `legacy_share` so the old links keep working after that API is retired:
 `GET /v1/legacy-shares/{slug}` answers with the stored document as is - the object
 `{ "metadata": {...}, "request": {...} }` at the top level, not wrapped in an envelope -
 plus `Cache-Control: public, max-age=86400` (shares never change), or `404` for an unknown
-slug. Nothing creates these rows but the import command:
+slug.
+
+Until the table has been imported, the old API fills in: when the slug is not stored - or
+the `legacy_share` table does not exist at all - and `legacyShareSourceUrl` is set, the
+controller fetches `{legacyShareSourceUrl}{slug}/` from the old API (10 s timeout), unwraps
+its `{"code": 200, "data": {...}}` envelope and answers with the `data` object in the same
+shape as a stored share. The old API's `404` is a `404` here; any other failure there (down,
+timeout, unexpected body) is a `502` with `{"error": ..., "detail": ...}`. A document fetched
+this way is also stored as a `legacy_share` row when the table exists (a failure to store is
+logged and does not fail the response), so the next request is served locally and the
+eventual import finds the row unchanged. The parameter lives in `config/common.neon`:
+
+```neon
+parameters:
+	legacyShareSourceUrl: 'https://api.satisfactorytools.com/v2/share/'   # '' disables the fallback
+```
+
+Override it in `config/local.neon`; set it to `''` once the old API is gone (or to serve only
+what the table holds). So the table is optional until the import runs - the deploy's schema
+update creates it empty, and the fallback fills it on demand. The import command then adds
+the rest:
 
 ```sh
 # straight from the old database
@@ -209,6 +275,55 @@ skipped, changed rows are updated, and rows whose slug is not 1-64 alphanumeric 
 or whose data is not a JSON object are counted as invalid and left out. The command prints
 progress per batch and a final imported / updated / unchanged / invalid summary. The
 `legacy_share` table is created by the usual `orm:schema-tool:create` / `update`.
+
+Legacy solver
+-------------
+
+Production lines imported from the old tools (shares, `.sft` files, the old site's local
+storage) were calculated by the old API's solver, whose weights and maximise rules differ
+from this app's. `POST /v1/legacy-solver` is that solver, ported from the old API
+(`app/Model/Legacy/`, the `ProductionSolver` + `LPSolver` pair behind the old
+`POST /v2/solver`) with its game data, so an imported line can be shown exactly as the old
+site showed it once the old API is retired. Public, no auth.
+
+Request body:
+
+```json
+{
+  "gameVersion": "1.0.0",
+  "request": {
+    "production": [{"item": "Desc_IronPlateReinforced_C", "type": "perMinute", "amount": 10, "ratio": 100}],
+    "input": [{"item": "Desc_IronIngot_C", "amount": 30}],
+    "resourceMax": {"Desc_OreIron_C": 92100},
+    "resourceWeight": {"Desc_OreIron_C": 1},
+    "blockedResources": [], "blockedRecipes": [], "blockedMachines": [],
+    "allowedAlternateRecipes": [], "sinkableResources": []
+  }
+}
+```
+
+`gameVersion` is one of `0.8.0`, `1.0.0`, `1.0.0-ficsmas` (anything else is a `400`);
+`request` is the old `IProductionDataRequest` as the old site stored it, read leniently:
+missing lists and maps are empty, unknown fields are ignored, production/input rows without
+an item are skipped. Two things the old API left to its client happen here instead:
+`blockedMachines` is folded into the recipe lists the way the old client did before calling
+the API (allowed alternates made in a blocked machine are dropped, base recipes made in a
+blocked machine are blocked), and resources missing from `resourceMax` / `resourceWeight`
+get the old client's defaults (`LegacyResourceDefaults` - the old API crashed on a missing
+key, and with every limit unbounded lp_solve cannot solve a `max` request).
+
+Response: `{"result": {"<column>": <number>, ...}}` with the old solver's column names -
+`Recipe_X_C@100#Desc_Machine_C` (machines), `Desc_X_C#Mine`, `Desc_X_C#Product`,
+`Desc_X_C#Byproduct`, `Desc_X_C#Input` and the pseudo columns `special__*` /
+`Maximise#Product`, which clients skip - as floats (the old API returned strings). An
+infeasible or empty solve is `{"result": {}}` with `200`, as on the old API.
+
+The game data is the old frontend's `data/*.json` copied to `data/legacy/{gameVersion}.json`
+(outside `www/`, so it is never served; the release tarball includes `data/`). The solver
+needs `lp_solve` (lp_solve 5.5, `apt install lp-solve`) - its path and the time limit are
+the `legacySolver.lpSolveBin` (default `/usr/bin/lp_solve`) and `legacySolver.timeout`
+(default 30 s) parameters in `config/common.neon`; a run over the limit is killed and
+answered with `504`, any other lp_solve failure with `500`.
 
 Importing game builds
 ----------------------

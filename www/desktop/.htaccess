@@ -1,0 +1,19 @@
+# Desktop app releases: latest.json (the updater manifest) and {version}/{file} installers,
+# uploaded by the frontend repository's CI. Served as static files, never by index.php.
+Header set Access-Control-Allow-Origin "*"
+Header set Access-Control-Allow-Methods "GET, OPTIONS"
+
+# disable directory listing
+<IfModule mod_autoindex.c>
+	Options -Indexes
+</IfModule>
+
+# installers and signatures are downloads, whatever the server's MIME table says
+AddType application/octet-stream .exe .msi .AppImage .deb .rpm .dmg .sig .gz
+# never Content-Encoding: gzip on .tar.gz bundles, or clients unpack them and the signature fails
+RemoveEncoding .gz
+
+# the manifest changes in place on every release, so clients must revalidate it
+<FilesMatch "^latest\.json$">
+	Header set Cache-Control "no-cache"
+</FilesMatch>

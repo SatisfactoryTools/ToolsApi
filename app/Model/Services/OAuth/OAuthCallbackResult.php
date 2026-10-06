@@ -2,8 +2,16 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
+use greeny\SatisfactoryTools\Api\Model\Entities\OAuthState;
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
 
+/**
+ * Outcome of a callback: either the user was authenticated (login/signup, tokens issued)
+ * or an already-authenticated user linked a new provider (no tokens).
+ *
+ * desktopState is set when the flow was started by the desktop app: the outcome then goes
+ * to that state row (see OAuthService::completeDesktop()) instead of to the browser.
+ */
 class OAuthCallbackResult
 {
 
@@ -13,6 +21,7 @@ class OAuthCallbackResult
 		public readonly User $user,
 		public readonly string $provider,
 		public readonly ?array $tokens,
+		public readonly ?OAuthState $desktopState = null,
 	)
 	{
 	}
@@ -26,6 +35,11 @@ class OAuthCallbackResult
 	public static function linkedTo(User $user, string $provider): self
 	{
 		return new self(true, $user, $provider, null);
+	}
+
+	public function forDesktop(OAuthState $state): self
+	{
+		return new self($this->linked, $this->user, $this->provider, $this->tokens, $state);
 	}
 
 }

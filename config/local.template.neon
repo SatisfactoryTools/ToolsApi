@@ -11,6 +11,15 @@ parameters:
 	# Optional: public base URL of this API for link preview images (default: production).
 	# publicApiUrl: 'https://api.sftools.local'
 
+	# Optional: where GET /v1/legacy-shares/{slug} fetches shares that are not stored
+	# locally (default: the old API). Set to '' to serve only the legacy_share table.
+	# legacyShareSourceUrl: ''
+
+	# Optional: the lp_solve binary and time limit of POST /v1/legacy-solver.
+	# legacySolver:
+	#     lpSolveBin: '/usr/local/bin/lp_solve'
+	#     timeout: 30
+
 	# See docs/oauth-provider-setup.md for how to obtain each of these.
 	oauthDiscordClientId: ''
 	oauthDiscordClientSecret: ''

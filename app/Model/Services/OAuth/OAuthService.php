@@ -9,11 +9,15 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Repositories\OAuthIdentityRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\OAuthStateRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\UserRepository;
+use greeny\SatisfactoryTools\Api\Model\Services\AuthException;
 use greeny\SatisfactoryTools\Api\Model\Services\AuthService;
 use Nette\Utils\Random;
 
 class OAuthService
 {
+
+	/** Seconds a completed desktop flow stays pollable, even past the state's TTL. */
+	private const DESKTOP_RESULT_GRACE = 60;
 
 	public function __construct(
 		private readonly OAuthProviderRegistry $registry,
@@ -38,8 +42,17 @@ class OAuthService
 		return $this->registry->has($providerKey);
 	}
 
-	/** @return array{authorizationUrl: string, state: string} */
-	public function start(string $providerKey, ?User $linkUser = null): array
+	/**
+	 * Begin an authorization flow. When $linkUser is set the flow links the provider to
+	 * that already-authenticated user rather than logging in / signing up.
+	 *
+	 * A $desktop flow also gets a poll token: the desktop app opens the authorization URL
+	 * in the system browser, whose callback cannot reach the app, so the app polls
+	 * /desktop/poll (findDesktopState()) with the state and this token for the outcome instead.
+	 *
+	 * @return array{authorizationUrl: string, state: string, pollToken?: string}
+	 */
+	public function start(string $providerKey, ?User $linkUser = null, bool $desktop = false): array
 	{
 		$provider = $this->registry->get($providerKey);
 		$this->stateRepository->deleteExpired();
@@ -48,17 +61,33 @@ class OAuthService
 		$state->state = Random::generate(48, '0-9a-zA-Z');
 		$state->provider = $providerKey;
 		$state->linkUser = $linkUser;
+		$state->pollToken = $desktop ? Random::generate(48, '0-9a-zA-Z') : null;
 		$state->expiresAt = new DateTimeImmutable('+' . $this->stateTtl . ' seconds');
 		$state->createdAt = new DateTimeImmutable();
 		$this->stateRepository->save($state);
 
-		return [
+		$result = [
 			'authorizationUrl' => $provider->getAuthorizationUrl($state->state, $this->redirectUriFor($providerKey)),
 			'state' => $state->state,
 		];
+		if ($state->pollToken !== null) {
+			$result['pollToken'] = $state->pollToken;
+		}
+
+		return $result;
 	}
 
-	/** @param array<string, mixed> $params */
+	/**
+	 * Validate the provider callback and either authenticate (login/signup) or link.
+	 *
+	 * For a desktop flow the state row is kept rather than consumed and the result carries
+	 * it (OAuthCallbackResult::$desktopState): the caller stores the response body with
+	 * completeDesktop(). A failed exchange is stored as `{"error": ...}` here before the
+	 * exception is rethrown, so the polling app learns about it too.
+	 *
+	 * @param array<string, mixed> $params the query parameters the provider sent to the callback
+	 * @throws OAuthException
+	 */
 	public function handleCallback(string $providerKey, array $params): OAuthCallbackResult
 	{
 		$provider = $this->registry->get($providerKey);
@@ -69,6 +98,11 @@ class OAuthService
 		}
 
 		$state = $this->stateRepository->getByState($stateValue);
+		if ($state !== null && $state->completedAt !== null) {
+			// A finished desktop flow waiting for its poll: refuse a second callback, but
+			// leave the stored result for the app to collect.
+			throw new OAuthException('Invalid or expired OAuth state');
+		}
 		if ($state === null || $state->provider !== $providerKey || $state->expiresAt < new DateTimeImmutable()) {
 			if ($state !== null) {
 				$this->stateRepository->delete($state);
@@ -77,14 +111,76 @@ class OAuthService
 		}
 
 		$linkUser = $state->linkUser;
-		// State is single-use: consume it before doing anything else.
+
+		if ($state->pollToken === null) {
+			// State is single-use: consume it before doing anything else.
+			$this->stateRepository->delete($state);
+
+			return $this->exchange($provider, $providerKey, $params, $linkUser);
+		}
+
+		try {
+			return $this->exchange($provider, $providerKey, $params, $linkUser)->forDesktop($state);
+		} catch (AuthException $e) {
+			$this->completeDesktop($state, ['error' => $e->getMessage()]);
+			throw $e;
+		}
+	}
+
+	/**
+	 * Records the outcome of a desktop flow's callback for the app to poll. Single-use:
+	 * handleCallback() refuses a state that has completed.
+	 *
+	 * @param array<string, mixed> $result the response body the callback would have returned
+	 */
+	public function completeDesktop(OAuthState $state, array $result): void
+	{
+		$now = new DateTimeImmutable();
+		$state->result = $result;
+		$state->completedAt = $now;
+		// Leave the app a moment to collect a result that lands just before the state expires.
+		$minimumExpiry = $now->modify('+' . self::DESKTOP_RESULT_GRACE . ' seconds');
+		if ($state->expiresAt < $minimumExpiry) {
+			$state->expiresAt = $minimumExpiry;
+		}
+		$this->stateRepository->save($state);
+	}
+
+	/**
+	 * Looks up a desktop flow for the app's poll. Null when the state is unknown, expired,
+	 * not a desktop flow or the token does not match - the caller cannot tell these apart.
+	 */
+	public function findDesktopState(string $stateValue, string $pollToken): ?OAuthState
+	{
+		if ($stateValue === '' || $pollToken === '') {
+			return null;
+		}
+
+		$state = $this->stateRepository->getByState($stateValue);
+		if ($state === null || $state->pollToken === null || !hash_equals($state->pollToken, $pollToken)) {
+			return null;
+		}
+		if ($state->expiresAt < new DateTimeImmutable()) {
+			$this->stateRepository->delete($state);
+
+			return null;
+		}
+
+		return $state;
+	}
+
+	/**
+	 * Hands a completed desktop flow's stored result over and deletes the state, so the
+	 * tokens in it can be collected only once.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function consumeDesktopResult(OAuthState $state): array
+	{
+		$result = $state->result ?? ['error' => 'Sign-in failed'];
 		$this->stateRepository->delete($state);
 
-		$info = $provider->fetchUserInfo($params, $this->redirectUriFor($providerKey));
-
-		return $linkUser !== null
-			? $this->link($linkUser, $providerKey, $info)
-			: $this->loginOrSignup($providerKey, $info);
+		return $result;
 	}
 
 	/** @return list<array{provider: string, email: string|null, nickname: string|null, avatarUrl: string|null, connectedAt: string, canDisconnect: bool}> */
@@ -128,6 +224,20 @@ class OAuthService
 		$this->identityRepository->delete($identity);
 	}
 
+	/**
+	 * @param array<string, mixed> $params
+	 * @throws OAuthException
+	 */
+	private function exchange(OAuthProviderInterface $provider, string $providerKey, array $params, ?User $linkUser): OAuthCallbackResult
+	{
+		$info = $provider->fetchUserInfo($params, $this->redirectUriFor($providerKey));
+
+		return $linkUser !== null
+			? $this->link($linkUser, $providerKey, $info)
+			: $this->loginOrSignup($providerKey, $info);
+	}
+
+	/** @throws OAuthException */
 	private function link(User $user, string $providerKey, OAuthUserInfo $info): OAuthCallbackResult
 	{
 		$existing = $this->identityRepository->getByProviderAccount($providerKey, $info->providerUserId);

@@ -29,3 +29,5 @@ www/data/help/*
 !www/data/help/images/
 www/data/help/images/*
 !www/data/help/images/.htaccess
+www/desktop/*
+!www/desktop/.htaccess
