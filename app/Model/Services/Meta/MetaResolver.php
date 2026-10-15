@@ -5,6 +5,7 @@ namespace greeny\SatisfactoryTools\Api\Model\Services\Meta;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use greeny\SatisfactoryTools\Api\Model\Repositories\HelpArticleRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
+use greeny\SatisfactoryTools\Api\Model\Services\PlanLinkService;
 use greeny\SatisfactoryTools\Api\Model\Services\ShareService;
 use JsonException;
 use Psr\Log\LoggerInterface;
@@ -51,6 +52,7 @@ class MetaResolver
 	public function __construct(
 		private readonly VersionRepository $versionRepository,
 		private readonly ShareService $shareService,
+		private readonly PlanLinkService $planLinkService,
 		private readonly HelpArticleRepository $helpArticleRepository,
 		private readonly VersionMetaIndex $versionMetaIndex,
 		private readonly LoggerInterface $logger,
@@ -139,7 +141,14 @@ class MetaResolver
 			return $this->codex($version, $codexPath);
 		}
 
-		// A plan id never reveals the (private) plan's name.
+		if (isset($segments[2])) {
+			$plan = $this->planLink($segments[2]);
+			if ($plan !== null) {
+				return $plan;
+			}
+		}
+
+		// Plans the API does not know (device-only) or with link access off keep the generic title.
 		return new PageMeta(
 			MetaText::title(sprintf('Planner (%s)', $version->name)),
 			MetaText::DEFAULT_DESCRIPTION,
@@ -166,7 +175,7 @@ class MetaResolver
 		}
 		[$sectionTitle, $sectionNoun, $entityLabel] = self::CODEX_SECTIONS[$section];
 		$sectionMeta = new PageMeta(
-			MetaText::title(sprintf('%s – Codex (%s)', $sectionTitle, $version->name)),
+			MetaText::title(sprintf('%s - Codex (%s)', $sectionTitle, $version->name)),
 			sprintf('All %s in Satisfactory (%s).', $sectionNoun, $version->name),
 			null,
 			'codex-section',
@@ -243,6 +252,29 @@ class MetaResolver
 		);
 	}
 
+	private function planLink(string $uuid): ?PageMeta
+	{
+		if (preg_match(self::UUID_PATTERN, $uuid) !== 1) {
+			return null;
+		}
+		$payload = $this->planLinkService->present($uuid);
+		if ($payload === null || !is_array($payload['root'])) {
+			return null;
+		}
+
+		$root = $payload['root'];
+		$version = is_string($payload['version']['id'] ?? null) ? $this->versionRepository->getByUuid($payload['version']['id']) : null;
+		$versionName = $version?->name ?? (is_string($payload['version']['name'] ?? null) ? $payload['version']['name'] : '');
+		$description = is_string($root['description'] ?? null) ? MetaText::description($root['description']) : '';
+
+		return new PageMeta(
+			MetaText::title(is_string($root['name'] ?? null) ? $root['name'] : ''),
+			$description !== '' ? $description : sprintf('Production plan for Satisfactory (%s).', $versionName),
+			$version !== null ? $this->planImage($version, $root['data'] ?? null) : null,
+			'plan',
+		);
+	}
+
 	/** @param array<string, mixed> $folder */
 	private function countPlans(array $folder): int
 	{
@@ -275,7 +307,7 @@ class MetaResolver
 		}
 
 		return new PageMeta(
-			MetaText::title($article['title'] . ' – Help'),
+			MetaText::title($article['title'] . ' - Help'),
 			$article['summary'] !== '' ? MetaText::description($article['summary']) : self::FIXED_PAGES['help'][1],
 			null,
 			'help-article',

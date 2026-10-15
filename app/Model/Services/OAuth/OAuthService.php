@@ -206,7 +206,7 @@ class OAuthService
 			if ($existing->user->id === $user->id) {
 				$this->refreshProfile($existing, $info);
 
-				return OAuthCallbackResult::linkedTo($user, $providerKey); // already linked — idempotent
+				return OAuthCallbackResult::linkedTo($user, $providerKey); // already linked - idempotent
 			}
 			throw new OAuthException('This ' . $providerKey . ' account is already linked to another user');
 		}

@@ -2,6 +2,7 @@
 # uploaded by the frontend repository's CI. Served as static files, never by index.php.
 Header set Access-Control-Allow-Origin "*"
 Header set Access-Control-Allow-Methods "GET, OPTIONS"
+Header set Access-Control-Allow-Headers "Content-Type, Authorization"
 
 # disable directory listing
 <IfModule mod_autoindex.c>

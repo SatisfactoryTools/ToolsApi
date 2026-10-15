@@ -107,7 +107,7 @@ class WorldDataService
 	{
 		$dir = dirname($cacheFile);
 		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) { // @ intentional
-			return; // caching is best-effort — the result is still returned
+			return; // caching is best-effort - the result is still returned
 		}
 
 		$tmp = $cacheFile . '.tmp';
@@ -125,7 +125,7 @@ class WorldDataService
 	{
 		$dir = dirname($lockFile);
 		if (!is_dir($dir) && !@mkdir($dir, 0o775, true) && !is_dir($dir)) { // @ intentional
-			return $callback(); // no lock dir — run unguarded rather than fail
+			return $callback(); // no lock dir - run unguarded rather than fail
 		}
 
 		$handle = @fopen($lockFile, 'c'); // @ intentional

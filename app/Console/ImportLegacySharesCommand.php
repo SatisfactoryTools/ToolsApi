@@ -68,7 +68,7 @@ class ImportLegacySharesCommand extends Command
 			  <info>php bin/console legacy-shares:import --file=/path/to/shared.jsonl</info>
 
 			(<comment>-N</comment> drops the header line, <comment>-B</comment> prints one row per line, <comment>-r</comment> writes the JSON without
-			the client's tab/newline escaping — JSON_OBJECT already escapes everything.)
+			the client's tab/newline escaping - JSON_OBJECT already escapes everything.)
 
 			Rows whose slug is not 1-64 alphanumeric characters or whose data is not a JSON object are
 			counted as invalid and skipped.
