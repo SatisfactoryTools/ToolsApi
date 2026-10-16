@@ -10,6 +10,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use greeny\SatisfactoryTools\Api\Model\Repositories\SharedVisitRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\ShareRepository;
+use greeny\SatisfactoryTools\Api\Model\Repositories\SupporterRepository;
 use JsonException;
 use Ramsey\Uuid\Uuid;
 
@@ -30,6 +31,7 @@ class ShareService
 		private readonly PlanTreeBuilder $treeBuilder,
 		private readonly ShareRepository $shareRepository,
 		private readonly SharedVisitRepository $sharedVisitRepository,
+		private readonly SupporterRepository $supporterRepository,
 	)
 	{
 	}
@@ -81,6 +83,8 @@ class ShareService
 			'sharedAt' => $share->createdAt->format('c'),
 			'version' => $snapshot['version'] ?? null,
 			'root' => $snapshot['root'] ?? null,
+			// Read live, so turning the badge off also takes it off shares made earlier.
+			'sharedBySupporter' => $this->supporterRepository->showsShareBadge($share->user),
 		];
 	}
 
@@ -100,6 +104,7 @@ class ShareService
 				'sharedAt' => $share->createdAt->format('c'),
 				'visitedAt' => $visit->visitedAt->format('c'),
 				'version' => $snapshot['version'] ?? null,
+				'sharedBySupporter' => $this->supporterRepository->showsShareBadge($share->user),
 			];
 			if ($share->type === 'plan') {
 				$entry['iconClassName'] = $this->resolvePlanIcon($snapshot['root']['data'] ?? null);

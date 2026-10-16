@@ -11,6 +11,7 @@ use greeny\SatisfactoryTools\Api\Model\Repositories\OAuthStateRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\UserRepository;
 use greeny\SatisfactoryTools\Api\Model\Services\AuthException;
 use greeny\SatisfactoryTools\Api\Model\Services\AuthService;
+use greeny\SatisfactoryTools\Api\Model\Services\Supporters\SupporterService;
 use Nette\Utils\Random;
 
 class OAuthService
@@ -24,6 +25,7 @@ class OAuthService
 		private readonly OAuthIdentityRepository $identityRepository,
 		private readonly UserRepository $userRepository,
 		private readonly AuthService $authService,
+		private readonly SupporterService $supporterService,
 		private readonly string $callbackBaseUrl,
 		private readonly int $stateTtl,
 	)
@@ -194,9 +196,14 @@ class OAuthService
 	{
 		$info = $provider->fetchUserInfo($params, $this->redirectUriFor($providerKey));
 
-		return $linkUser !== null
+		$result = $linkUser !== null
 			? $this->link($linkUser, $providerKey, $info)
 			: $this->loginOrSignup($providerKey, $info);
+
+		// Every sign-in and every newly linked provider may bring an email that is on the supporter list.
+		$this->supporterService->syncUser($result->user);
+
+		return $result;
 	}
 
 	private function link(User $user, string $providerKey, OAuthUserInfo $info): OAuthCallbackResult

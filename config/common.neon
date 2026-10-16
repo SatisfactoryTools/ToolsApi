@@ -1,6 +1,18 @@
 parameters:
 	# Optional secrets default to empty so existing local.neon files keep working.
 	oauthSteamApiKey: ''
+	supporterPatreonAccessToken: ''
+	supporterPatreonRefreshToken: ''
+	supporterPatreonClientId: ''
+	supporterPatreonClientSecret: ''
+	supporterPatreonCampaignId: ''
+	supporterPatreonWebhookSecret: ''
+	supporterPaypalClientId: ''
+	supporterPaypalClientSecret: ''
+	supporterPaypalSandbox: false
+	supporterDiscordBotToken: ''
+	supporterDiscordGuildId: ''
+	supporterDiscordRoleId: ''
 
 	# Public base URL of this API, for absolute image URLs in link previews (GET /v1/meta).
 	# Not derived from the request: the caller is the frontend's index.php, not a browser.
@@ -26,6 +38,24 @@ parameters:
 		generatorBin: %worldDataGeneratorBin%
 		worldFile: %worldDataWorldFile%
 		timeout: 60               # seconds
+
+	# Supporter matching (see readme "Supporters"). A source without credentials is skipped.
+	supporters:
+		patreon:
+			accessToken: %supporterPatreonAccessToken%
+			refreshToken: %supporterPatreonRefreshToken%
+			clientId: %supporterPatreonClientId%
+			clientSecret: %supporterPatreonClientSecret%
+			campaignId: %supporterPatreonCampaignId%
+			webhookSecret: %supporterPatreonWebhookSecret%
+		paypal:
+			clientId: %supporterPaypalClientId%
+			clientSecret: %supporterPaypalClientSecret%
+			sandbox: %supporterPaypalSandbox%
+		discord:
+			botToken: %supporterDiscordBotToken%
+			guildId: %supporterDiscordGuildId%
+			roleId: %supporterDiscordRoleId%
 
 	oauth:
 		callbackBaseUrl: %oauthCallbackBaseUrl%

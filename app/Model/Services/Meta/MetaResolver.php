@@ -236,7 +236,8 @@ class MetaResolver
 
 			return new PageMeta(
 				MetaText::title($name),
-				MetaText::description(sprintf('Shared folder with %d %s for Satisfactory (%s).', $count, $count === 1 ? 'plan' : 'plans', $versionName)),
+				MetaText::description(sprintf('Shared folder with %d %s for Satisfactory (%s).', $count, $count === 1 ? 'plan' : 'plans', $versionName)
+					. $this->supporterNote($share['sharedBySupporter'] ?? false)),
 				null,
 				'share-folder',
 			);
@@ -246,7 +247,10 @@ class MetaResolver
 
 		return new PageMeta(
 			MetaText::title($name),
-			$description !== '' ? $description : sprintf('Shared production plan for Satisfactory (%s).', $versionName),
+			$this->withSupporterNote(
+				$description !== '' ? $description : sprintf('Shared production plan for Satisfactory (%s).', $versionName),
+				$share['sharedBySupporter'] ?? false,
+			),
 			$version !== null ? $this->planImage($version, $root['data'] ?? null) : null,
 			'share-plan',
 		);
@@ -269,10 +273,32 @@ class MetaResolver
 
 		return new PageMeta(
 			MetaText::title(is_string($root['name'] ?? null) ? $root['name'] : ''),
-			$description !== '' ? $description : sprintf('Production plan for Satisfactory (%s).', $versionName),
+			$this->withSupporterNote(
+				$description !== '' ? $description : sprintf('Production plan for Satisfactory (%s).', $versionName),
+				$payload['sharedBySupporter'] ?? false,
+			),
 			$version !== null ? $this->planImage($version, $root['data'] ?? null) : null,
 			'plan',
 		);
+	}
+
+	private function supporterNote(mixed $sharedBySupporter): string
+	{
+		return $sharedBySupporter === true ? ' ' . MetaText::SUPPORTER_NOTE : '';
+	}
+
+	/** The note goes first when the text is long, so the length cap cuts the description and never the note. */
+	private function withSupporterNote(string $description, mixed $sharedBySupporter): string
+	{
+		if ($sharedBySupporter !== true) {
+			return $description;
+		}
+		$suffixed = $description . ' ' . MetaText::SUPPORTER_NOTE;
+		if (mb_strlen($suffixed) <= MetaText::DESCRIPTION_MAX_LENGTH) {
+			return $suffixed;
+		}
+
+		return MetaText::description(MetaText::SUPPORTER_NOTE . ' ' . $description);
 	}
 
 	/** @param array<string, mixed> $folder */

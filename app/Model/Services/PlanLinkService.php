@@ -3,6 +3,7 @@
 namespace greeny\SatisfactoryTools\Api\Model\Services;
 
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
+use greeny\SatisfactoryTools\Api\Model\Repositories\SupporterRepository;
 use Ramsey\Uuid\Uuid;
 
 class PlanLinkService
@@ -11,6 +12,7 @@ class PlanLinkService
 	public function __construct(
 		private readonly PlanRepository $planRepository,
 		private readonly PlanTreeBuilder $treeBuilder,
+		private readonly SupporterRepository $supporterRepository,
 	)
 	{
 	}
@@ -38,6 +40,7 @@ class PlanLinkService
 			'updatedAt' => $plan->getUpdatedAt()->format('c'),
 			'version' => $this->treeBuilder->versionSnapshot($plan->version),
 			'root' => $this->treeBuilder->planNode($plan, $index),
+			'sharedBySupporter' => $this->supporterRepository->showsShareBadge($plan->user),
 		];
 	}
 

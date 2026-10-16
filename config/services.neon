@@ -74,6 +74,45 @@ services:
 
 	- greeny\SatisfactoryTools\Api\Console\ImportLegacySharesCommand
 
+	- greeny\SatisfactoryTools\Api\Console\SupportersSyncCommand
+
+	- greeny\SatisfactoryTools\Api\Console\SupportersImportCommand
+
+	- greeny\SatisfactoryTools\Api\Console\SupportersGrantCommand
+
+	- greeny\SatisfactoryTools\Api\Console\SupportersRevokeCommand
+
+	- greeny\SatisfactoryTools\Api\Model\Services\Supporters\SupporterHttpClient
+
+	- greeny\SatisfactoryTools\Api\Model\Services\Supporters\SupporterEmailHasher
+
+	- greeny\SatisfactoryTools\Api\Model\Services\Supporters\SupporterService
+
+	- greeny\SatisfactoryTools\Api\Model\Services\Supporters\DiscordRoleService(
+		botToken: %supporters.discord.botToken%,
+		guildId: %supporters.discord.guildId%,
+		roleId: %supporters.discord.roleId%
+	)
+
+	- greeny\SatisfactoryTools\Api\Model\Services\Supporters\PatreonTokenStore(
+		file: %tempDir%/state/patreon-token.json,
+		configAccessToken: %supporters.patreon.accessToken%,
+		configRefreshToken: %supporters.patreon.refreshToken%
+	)
+
+	- greeny\SatisfactoryTools\Api\Model\Services\Supporters\PatreonClient(
+		clientId: %supporters.patreon.clientId%,
+		clientSecret: %supporters.patreon.clientSecret%,
+		campaignId: %supporters.patreon.campaignId%,
+		webhookSecret: %supporters.patreon.webhookSecret%
+	)
+
+	- greeny\SatisfactoryTools\Api\Model\Services\Supporters\PaypalClient(
+		clientId: %supporters.paypal.clientId%,
+		clientSecret: %supporters.paypal.clientSecret%,
+		sandbox: %supporters.paypal.sandbox%
+	)
+
 	authService:
 		factory: greeny\SatisfactoryTools\Api\Model\Services\AuthService(
 			jwtSecret: %jwt.secret%,

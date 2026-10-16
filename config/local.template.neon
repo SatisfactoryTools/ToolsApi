@@ -30,6 +30,22 @@ parameters:
 	# Optional Steam Web API key (https://steamcommunity.com/dev/apikey), only used to read the persona name/avatar for display.
 	oauthSteamApiKey: ''
 
+	# Optional: supporter matching (readme "Supporters"). Leave a source empty to skip it.
+	# Patreon: the creator's access/refresh token from https://www.patreon.com/portal/registration/register-clients
+	# supporterPatreonAccessToken: ''
+	# supporterPatreonRefreshToken: ''
+	# supporterPatreonClientId: ''
+	# supporterPatreonClientSecret: ''
+	# supporterPatreonCampaignId: ''      # found automatically when empty
+	# supporterPatreonWebhookSecret: ''   # enables POST /v1/supporters/webhooks/patreon
+	# PayPal: a live REST app (https://developer.paypal.com/dashboard/applications) with "Transaction search" ticked
+	# supporterPaypalClientId: ''
+	# supporterPaypalClientSecret: ''
+	# Discord: a bot with Manage Roles in the server, its role above the supporter role
+	# supporterDiscordBotToken: ''
+	# supporterDiscordGuildId: ''
+	# supporterDiscordRoleId: ''
+
 nettrine.dbal:
 	connections:
 		default:

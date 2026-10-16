@@ -10,6 +10,8 @@ final class MetaText
 	public const string TITLE_SUFFIX = ' - ' . self::SITE_NAME;
 	public const int DESCRIPTION_MAX_LENGTH = 200;
 
+	public const string SUPPORTER_NOTE = '♥ Shared by a Satisfactory Tools supporter.';
+
 	public const string DEFAULT_DESCRIPTION = 'Plan factories that actually work. An optimising production and logistics planner for Satisfactory, supporting every factory - from the first smelter to a 1 TW nuclear grid. Includes a searchable codex, custom versions and mods.';
 
 	/** Tag-like markup only (`<b>`, `</color>`, `<img src=…/>`), so a bare "<" in text survives. */

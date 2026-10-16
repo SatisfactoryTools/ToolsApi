@@ -155,11 +155,52 @@ Endpoints (v1)
   satisfactorytools.com (public, no auth; see "Legacy shares" below)
 - `POST /v1/legacy-solver` - the old tools' production solver, for calculating imported old
   production lines exactly as the old site did (public, no auth; see "Legacy solver" below)
+- `PUT /v1/account/supporter` - a supporter's own choices (list name, share badge, gold bar, name heart,
+  `welcomed`); `GET /v1/supporters` - the public supporters list (public, no auth);
+  `POST /v1/supporters/webhooks/patreon` - Patreon member webhook (see "Supporters" below)
 - `GET /v1/meta?path={frontend path}` - link preview metadata (title, description, image)
   of a frontend page, for the frontend's `index.php` to print into `<head>`. Public, always
   200 (defaults for anything unknown). Codex lookups use a per-version index kept in
   `temp/cache`; image URLs are built from the `publicApiUrl` parameter. Text rules are
   tested by `php tests/MetaTextTest.php`.
+
+Supporters
+----------
+
+Anyone who ever paid on Patreon or PayPal (once is enough) is marked as supporter for good. Nothing is
+behind a paywall; supporters get a heart on the plans they share, a gold top bar, a heart next to their
+name, an optional entry on the About page's supporters list and, with Discord linked, a Discord role.
+
+Matching goes by email. `supporter_email` holds SHA-256 hashes of the normalised (trimmed, lowercased)
+addresses, kept apart from accounts so people without an account yet (or who supported the old tools)
+are matched once they sign in. An account is marked (a `supporter` row) when its account email
+(`user.email`) or the email of a linked sign-in method (`oauth_identity.email`) is on the list: on every
+sign-in, registration and provider link, and whenever new emails are imported. The account email of a
+password account is not verified; that is accepted because the list is not public.
+`supporter` rows are never removed by a sync, only by `supporters:revoke`.
+
+Commands:
+
+- `supporters:sync` - daily cron job: reads every Patreon member (anyone with a payment, including
+  former patrons), PayPal payments from `--since` (default 3 days back; run once with an older date to
+  read the history), then hands out the Discord role. Sources without credentials are skipped.
+- `supporters:import --source=legacy|paypal|patreon|manual --file=...` - a plain list of emails, or a
+  CSV export (PayPal activity download, Patreon members export); rows without money received are
+  skipped when there is an amount column.
+- `supporters:add <email|login|id>` - an email goes on the list; a login or id marks that account
+  directly.
+- `supporters:revoke <login|id> [--forget-emails]` - refunds and chargebacks. A Discord role stays.
+
+Credentials go in `local.neon` (see `local.template.neon`):
+
+- **Patreon**: register a client at https://www.patreon.com/portal/registration/register-clients and use
+  its *creator's* access and refresh token (they can read members' emails). Refreshed tokens are kept in
+  `temp/state/patreon-token.json`; pasting a new access token into `local.neon` overrides that file.
+  For instant updates add a webhook to `{api}/v1/supporters/webhooks/patreon` with the `members:create`,
+  `members:update` and `members:pledge:*` triggers and put its secret in `supporterPatreonWebhookSecret`.
+- **PayPal**: a live REST app with "Transaction search" ticked. PayPal lists payments up to 3 hours late.
+- **Discord**: a bot invited with Manage Roles, its role above the supporter role; the bot token, server
+  id and role id. A supporter who is not in the server yet gets the role on a later sync.
 
 Desktop sign-in
 ---------------

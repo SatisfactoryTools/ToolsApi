@@ -11,6 +11,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PasswordResetTokenRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\RefreshTokenRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\UserRepository;
+use greeny\SatisfactoryTools\Api\Model\Services\Supporters\SupporterService;
 use Nette\Security\Passwords;
 use Nette\Utils\Random;
 use Throwable;
@@ -23,6 +24,7 @@ class AuthService
 		private readonly RefreshTokenRepository $refreshTokenRepository,
 		private readonly PasswordResetTokenRepository $passwordResetTokenRepository,
 		private readonly Passwords $passwords,
+		private readonly SupporterService $supporterService,
 		private readonly string $jwtSecret,
 		private readonly int $accessTokenTtl,
 		private readonly int $refreshTokenTtl,
@@ -49,6 +51,7 @@ class AuthService
 		$user->createdAt = new DateTimeImmutable();
 
 		$this->userRepository->save($user);
+		$this->supporterService->syncUser($user);
 
 		return $user;
 	}
@@ -60,6 +63,8 @@ class AuthService
 		if ($user === null || $user->passwordHash === null || !$this->passwords->verify($password, $user->passwordHash)) {
 			throw new AuthException('Invalid credentials');
 		}
+
+		$this->supporterService->syncUser($user);
 
 		return $this->issueTokens($user);
 	}
