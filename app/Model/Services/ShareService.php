@@ -111,7 +111,6 @@ class ShareService
 		return ['shares' => $shares];
 	}
 
-	/** Mirrors the frontend's icon rule; keep in sync. */
 	public function resolvePlanIcon(mixed $data): ?string
 	{
 		if (!is_string($data)) {
@@ -123,16 +122,9 @@ class ShareService
 			return null;
 		}
 
-		if (array_key_exists('iconClassName', $decoded)) {
-			return is_string($decoded['iconClassName']) && $decoded['iconClassName'] !== '' ? $decoded['iconClassName'] : null;
-		}
+		$className = $decoded['iconClassName'] ?? null;
 
-		$first = $decoded['requests'][0] ?? null;
-		if (is_array($first) && is_string($first['itemClassName'] ?? null) && $first['itemClassName'] !== '') {
-			return $first['itemClassName'];
-		}
-
-		return null;
+		return is_string($className) && $className !== '' ? $className : null;
 	}
 
 	public function recordVisit(User $user, string $shareUuid): bool
