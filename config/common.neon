@@ -13,6 +13,7 @@ parameters:
 	supporterDiscordBotToken: ''
 	supporterDiscordGuildId: ''
 	supporterDiscordRoleId: ''
+	errorReportDiscordChannelId: ''
 
 	# Public base URL of this API, for absolute image URLs in link previews (GET /v1/meta).
 	# Not derived from the request: the caller is the frontend's index.php, not a browser.
@@ -56,6 +57,10 @@ parameters:
 			botToken: %supporterDiscordBotToken%
 			guildId: %supporterDiscordGuildId%
 			roleId: %supporterDiscordRoleId%
+
+	# Frontend errors (POST /v1/errors) are posted to this channel by the supporter Discord bot.
+	errorReports:
+		discordChannelId: %errorReportDiscordChannelId%
 
 	oauth:
 		callbackBaseUrl: %oauthCallbackBaseUrl%

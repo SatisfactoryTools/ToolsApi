@@ -163,6 +163,11 @@ Endpoints (v1)
   200 (defaults for anything unknown). Codex lookups use a per-version index kept in
   `temp/cache`; image URLs are built from the `publicApiUrl` parameter. Text rules are
   tested by `php tests/MetaTextTest.php`.
+- `POST /v1/errors` - an error the frontend caught (`{message, details, app, build}`, public, no auth).
+  Stored in `client_error`, one row per message (repeats bump `count` and replace `details`). A new
+  message is posted to the Discord channel `errorReportDiscordChannelId` by the supporter bot (needs View
+  Channel + Send Messages there), and again at most once a day while it keeps happening. Capped at 200
+  new messages and 20 Discord posts an hour.
 
 Supporters
 ----------

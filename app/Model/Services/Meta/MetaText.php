@@ -12,7 +12,7 @@ final class MetaText
 
 	public const string SUPPORTER_NOTE = '♥ Shared by a Satisfactory Tools supporter.';
 
-	public const string DEFAULT_DESCRIPTION = 'Plan factories that actually work. An optimising production and logistics planner for Satisfactory, supporting every factory - from the first smelter to a 1 TW nuclear grid. Includes a searchable codex, custom versions and mods.';
+	public const string DEFAULT_DESCRIPTION = 'Production planner for Satisfactory. Tell it what you want to make and it works out the machines, recipes and resources you need. Also a searchable codex, custom versions and mods. Free to use.';
 
 	/** Tag-like markup only (`<b>`, `</color>`, `<img src=…/>`), so a bare "<" in text survives. */
 	private const string TAG_PATTERN = '~</?[A-Za-z][^<>]*>~u';

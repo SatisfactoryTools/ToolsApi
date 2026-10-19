@@ -94,6 +94,13 @@ services:
 		roleId: %supporters.discord.roleId%
 	)
 
+	- greeny\SatisfactoryTools\Api\Model\Services\Errors\ClientErrorService
+
+	- greeny\SatisfactoryTools\Api\Model\Services\Errors\DiscordErrorNotifier(
+		botToken: %supporters.discord.botToken%,
+		channelId: %errorReports.discordChannelId%
+	)
+
 	- greeny\SatisfactoryTools\Api\Model\Services\Supporters\PatreonTokenStore(
 		file: %tempDir%/state/patreon-token.json,
 		configAccessToken: %supporters.patreon.accessToken%,

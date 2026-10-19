@@ -46,6 +46,10 @@ parameters:
 	# supporterDiscordGuildId: ''
 	# supporterDiscordRoleId: ''
 
+	# Optional: Discord channel for frontend error notices (POST /v1/errors). Uses the supporter bot token above;
+	# the bot needs View Channel + Send Messages there. Errors are stored in client_error either way.
+	# errorReportDiscordChannelId: ''
+
 nettrine.dbal:
 	connections:
 		default:
