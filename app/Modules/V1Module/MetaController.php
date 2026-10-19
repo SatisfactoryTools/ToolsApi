@@ -12,7 +12,7 @@ use greeny\SatisfactoryTools\Api\Model\Services\Meta\MetaResolver;
 class MetaController extends BaseV1Controller
 {
 
-	private const string CACHE_CONTROL = 'public, max-age=300';
+	private const string CACHE_CONTROL = 'private, max-age=300';
 
 	public function __construct(private readonly MetaResolver $resolver)
 	{

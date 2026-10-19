@@ -25,7 +25,7 @@ class LegacySharesController extends BaseV1Controller
 
 	private const string SLUG_PATTERN = '~^[A-Za-z0-9]{1,64}$~D';
 
-	private const string CACHE_CONTROL = 'public, max-age=86400';
+	private const string CACHE_CONTROL = 'private, max-age=86400';
 
 	public function __construct(
 		private readonly LegacyShareRepository $legacyShareRepository,
