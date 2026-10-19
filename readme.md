@@ -379,12 +379,34 @@ official versions with:
 
 ```sh
 php bin/console publish --buildId=<steamBuildId> --branch=stable|experimental [--game-version=1.2.3.1] [--skip-world-data]
+    [--attach=<slug>]... [--new-version[=default|ficsmas]] [--summary-file=<path>]
 ```
 
-Re-running for the same build updates the versions in place (idempotent). Unless
-`--skip-world-data` is given, it also runs the world-data-generator (vanilla settings) and
-records the resource-node counts under `metadata.world` in each build's data file. Files
-keep the extractor's pretty (4-space) formatting.
+Unless `--skip-world-data` is given, it also runs the world-data-generator (vanilla settings) and
+records the resource-node counts under `metadata.world` in each build's data file (with the
+flag, an already stamped `metadata.world` is kept). Files keep the extractor's pretty (4-space)
+formatting.
+
+One official version can cover several game builds. Each variant (default / FICSMAS) is
+fingerprinted over the data the planner uses - everything except cosmetic fields such as
+icons, names, descriptions and stack sizes (`PlannerFingerprint::COSMETIC_FIELDS`). When the
+fingerprint matches the newest official version of the same branch and variant, the build is
+attached to it: the version keeps its slug, plans, folders and shares, while its `dataPath`
+and name move to the new build. Otherwise a new version `<branch>-<buildId>[-ficsmas]` is
+created and the output lists the planner changes that caused it. Every build is recorded in
+`version_build`; `GET /v1/versions` returns the covered game versions as `gameVersions`
+(oldest first). Old data files stay on disk.
+
+Overriding the decision (re-running for the same build is safe):
+
+- `--attach=<slug>` puts the variant matching that version onto it even though its planner data
+  differs. If the build had already been created as its own version, that version is deleted -
+  but only while no plans, folders, custom versions or shares reference it.
+- `--new-version` (both variants) or `--new-version=default|ficsmas` splits the build off into
+  its own version; the version it leaves falls back to its previous build.
+
+`--summary-file` writes the per-variant decision as JSON; the extractor uses it for its
+notifications.
 
 License
 -------

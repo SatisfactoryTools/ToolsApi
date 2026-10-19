@@ -13,6 +13,17 @@ class ShareRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['uuid' => $uuid]);
 	}
 
+	/** Shares only keep the version inside their JSON snapshot. */
+	public function countReferencingVersion(string $versionUuid): int
+	{
+		return (int) $this->getRepository()->createQueryBuilder('s')
+			->select('COUNT(s.id)')
+			->where('s.snapshot LIKE :needle')
+			->setParameter('needle', '%"' . $versionUuid . '"%')
+			->getQuery()
+			->getSingleScalarResult();
+	}
+
 	protected function getEntityClass(): string
 	{
 		return Share::class;

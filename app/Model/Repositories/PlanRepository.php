@@ -28,6 +28,11 @@ class PlanRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['uuid' => $uuid]);
 	}
 
+	public function countByVersion(Version $version): int
+	{
+		return $this->getRepository()->count(['version' => $version]);
+	}
+
 	/** @return array<string, array{planCount: int, lastUpdatedAt: DateTimeImmutable}> */
 	public function getSummaryByVersionForUser(User $user): array
 	{

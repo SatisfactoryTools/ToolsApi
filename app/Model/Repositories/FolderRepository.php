@@ -22,6 +22,11 @@ class FolderRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['uuid' => $uuid, 'user' => $user, 'version' => $version]);
 	}
 
+	public function countByVersion(Version $version): int
+	{
+		return $this->getRepository()->count(['version' => $version]);
+	}
+
 	protected function getEntityClass(): string
 	{
 		return Folder::class;

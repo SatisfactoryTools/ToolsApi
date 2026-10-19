@@ -13,6 +13,7 @@ class VersionResponse extends ArrayableResponse
 	/**
 	 * @param string[] $mods
 	 * @param array<string, mixed>|null $worldData
+	 * @param string[] $gameVersions oldest first
 	 */
 	public function __construct(
 		public UuidInterface $id,
@@ -28,6 +29,7 @@ class VersionResponse extends ArrayableResponse
 		public readonly float $powerCost,
 		public readonly array $mods,
 		public readonly ?array $worldData,
+		public readonly array $gameVersions,
 	)
 	{
 	}
@@ -51,6 +53,8 @@ class VersionResponse extends ArrayableResponse
 				$entity->modVersions->toArray(),
 			),
 			worldData: $entity->worldData,
+			// Custom versions never have builds; skipping them avoids a lazy load per row.
+			gameVersions: $entity->custom ? [] : $entity->getGameVersions(),
 		);
 	}
 

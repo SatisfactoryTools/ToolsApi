@@ -32,6 +32,10 @@ services:
 
 	- greeny\SatisfactoryTools\Api\Model\Services\PlanTreeBuilder
 
+	- greeny\SatisfactoryTools\Api\Model\Services\PlannerFingerprint
+
+	- greeny\SatisfactoryTools\Api\Model\Services\OfficialVersionRegistry(wwwDir: %appDir%/../www)
+
 	- greeny\SatisfactoryTools\Api\Model\Services\Meta\VersionMetaIndex(wwwDir: %appDir%/../www)
 
 	- greeny\SatisfactoryTools\Api\Model\Services\Meta\MetaResolver(

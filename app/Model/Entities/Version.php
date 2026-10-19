@@ -61,10 +61,32 @@ class Version
 	#[ORM\OrderBy(['position' => 'ASC'])]
 	public Collection $modVersions;
 
+	#[ORM\Column(length: 64, nullable: true)]
+	public ?string $plannerHash = null;
+
+	/** @var Collection<int, VersionBuild> */
+	#[ORM\OneToMany(mappedBy: 'version', targetEntity: VersionBuild::class, cascade: ['persist'])]
+	#[ORM\OrderBy(['importedAt' => 'ASC', 'id' => 'ASC'])]
+	public Collection $builds;
+
 	public function __construct()
 	{
 		$this->users = new ArrayCollection();
 		$this->modVersions = new ArrayCollection();
+		$this->builds = new ArrayCollection();
+	}
+
+	/** @return string[] */
+	public function getGameVersions(): array
+	{
+		$gameVersions = [];
+		foreach ($this->builds as $build) {
+			if ($build->gameVersion !== null && !in_array($build->gameVersion, $gameVersions, true)) {
+				$gameVersions[] = $build->gameVersion;
+			}
+		}
+
+		return $gameVersions;
 	}
 
 	/** @return ModVersion[] */

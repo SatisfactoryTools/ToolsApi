@@ -58,6 +58,19 @@ class VersionRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['definitionHash' => $definitionHash]);
 	}
 
+	public function getLatestOfficial(bool $experimental, bool $ficsmas): ?Version
+	{
+		return $this->getRepository()->findOneBy(
+			['custom' => false, 'experimental' => $experimental, 'ficsmas' => $ficsmas],
+			['id' => 'DESC'],
+		);
+	}
+
+	public function countDerived(Version $version): int
+	{
+		return $this->getRepository()->count(['baseVersion' => $version]);
+	}
+
 	protected function getEntityClass(): string
 	{
 		return Version::class;

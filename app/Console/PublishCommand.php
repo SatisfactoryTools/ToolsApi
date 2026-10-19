@@ -3,12 +3,12 @@
 namespace greeny\SatisfactoryTools\Api\Console;
 
 use DateTimeImmutable;
-use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
+use greeny\SatisfactoryTools\Api\Model\Services\OfficialVersionRegistry;
+use greeny\SatisfactoryTools\Api\Model\Services\PublishOutcome;
 use greeny\SatisfactoryTools\Api\Model\Services\WorldDataException;
 use greeny\SatisfactoryTools\Api\Model\Services\WorldDataService;
 use JsonException;
-use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -32,6 +32,7 @@ class PublishCommand extends Command
 
 	public function __construct(
 		private readonly VersionRepository $versionRepository,
+		private readonly OfficialVersionRegistry $registry,
 		private readonly WorldDataService $worldDataService,
 		private readonly string $wwwDir,
 	)
@@ -45,7 +46,10 @@ class PublishCommand extends Command
 		$this->addOption('branch', null, InputOption::VALUE_REQUIRED, 'Logical branch: stable or experimental');
 		// Named --game-version (not --version) because Symfony reserves the global --version option.
 		$this->addOption('game-version', null, InputOption::VALUE_REQUIRED, 'Human game version, e.g. 1.2.3.1 (optional)');
-		$this->addOption('skip-world-data', null, InputOption::VALUE_NONE, 'Do not run the world-data generator / stamp metadata.world');
+		$this->addOption('skip-world-data', null, InputOption::VALUE_NONE, 'Do not run the world-data generator; an already stamped metadata.world is kept');
+		$this->addOption('attach', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Attach the build to this official version slug even if its planner data differs (one per variant; an unused version the build was previously registered as is merged away)');
+		$this->addOption('new-version', null, InputOption::VALUE_OPTIONAL, 'Register the variant (default or ficsmas; both when no value is given) as a new version even if its planner data matches the latest version', false);
+		$this->addOption('summary-file', null, InputOption::VALUE_REQUIRED, 'Write a JSON summary of what happened to each variant to this path');
 	}
 
 	protected function execute(InputInterface $input, OutputInterface $output): int
@@ -66,6 +70,18 @@ class PublishCommand extends Command
 
 		if (!in_array($branch, self::BRANCHES, true)) {
 			$io->error(sprintf('Option --branch must be one of: %s.', implode(', ', self::BRANCHES)));
+			return Command::FAILURE;
+		}
+
+		$attachSlugs = $this->resolveAttachSlugs((array) $input->getOption('attach'));
+		if (is_string($attachSlugs)) {
+			$io->error($attachSlugs);
+			return Command::FAILURE;
+		}
+
+		$newVersion = $input->getOption('new-version');
+		if ($newVersion !== false && $newVersion !== null && !in_array($newVersion, ['default', 'ficsmas'], true)) {
+			$io->error('Option --new-version accepts no value, "default" or "ficsmas".');
 			return Command::FAILURE;
 		}
 
@@ -97,64 +113,88 @@ class PublishCommand extends Command
 		$importedAt = (new DateTimeImmutable())->format('c');
 
 		try {
-			$versions = [];
+			$outcomes = [];
 			foreach ($variants as $variant) {
 				$this->stampMetadata($variant['absolute'], $buildId, $gameVersion, $branch, $variant['ficsmas'], $importedAt, $worldData);
-				$versions[] = $this->upsertVersion($buildId, $branch, $gameVersion, $variant['ficsmas'], $variant['dataPath']);
+				$outcomes[] = $this->registry->register(
+					$variant['dataPath'],
+					$buildId,
+					$branch,
+					$gameVersion,
+					$variant['ficsmas'],
+					$attachSlugs[(int) $variant['ficsmas']] ?? null,
+					$newVersion === null || $newVersion === ($variant['ficsmas'] ? 'ficsmas' : 'default'),
+				);
 			}
+			$this->versionRepository->flush();
 		} catch (\RuntimeException $e) {
 			$io->error($e->getMessage());
 			return Command::FAILURE;
 		}
 
-		foreach ($versions as $index => $version) {
-			$this->versionRepository->save($version, flush: $index === array_key_last($versions));
-			$io->writeln(sprintf('Imported <info>%s</info> (%s)', $version->name, $version->uuid->toString()));
+		foreach ($outcomes as $outcome) {
+			$this->report($io, $outcome);
+		}
+
+		$summaryFile = $input->getOption('summary-file');
+		if (is_string($summaryFile) && $summaryFile !== '') {
+			$summary = [
+				'buildId' => $buildId,
+				'branch' => $branch,
+				'gameVersion' => $gameVersion,
+				'variants' => array_map(static fn (PublishOutcome $outcome): array => $outcome->toArray(), $outcomes),
+			];
+			if (@file_put_contents($summaryFile, json_encode($summary, self::JSON_FLAGS)) === false) { // @ intentional
+				$io->warning(sprintf('Could not write summary file: %s', $summaryFile));
+			}
 		}
 
 		$io->success(sprintf('Build %s (%s) imported.', $buildId, $branch));
 		return Command::SUCCESS;
 	}
 
-	private function upsertVersion(
-		string $buildId,
-		string $branch,
-		?string $gameVersion,
-		bool $ficsmas,
-		string $dataPath,
-	): Version
+	/**
+	 * Keyed by the variant's ficsmas flag (0/1), or an error message.
+	 *
+	 * @param string[] $slugs
+	 * @return array<int, string>|string
+	 */
+	private function resolveAttachSlugs(array $slugs): array|string
 	{
-		$version = $this->versionRepository->getByDataPath($dataPath) ?? new Version();
-		if (!isset($version->uuid)) {
-			$version->uuid = Uuid::uuid4();
+		$resolved = [];
+		foreach ($slugs as $slug) {
+			$version = $this->versionRepository->getBySlug((string) $slug);
+			if ($version === null || $version->custom) {
+				return sprintf('Official version "%s" not found.', $slug);
+			}
+			$key = (int) $version->ficsmas;
+			if (isset($resolved[$key])) {
+				return sprintf('Only one --attach per variant; "%s" and "%s" are both %s.', $resolved[$key], $slug, $version->ficsmas ? 'FICSMAS' : 'non-FICSMAS');
+			}
+			$resolved[$key] = (string) $slug;
 		}
 
-		$version->name = $this->buildName($buildId, $branch, $gameVersion, $ficsmas);
-		$version->slug = sprintf('%s-%s%s', $branch, $buildId, $ficsmas ? '-ficsmas' : '');
-		$version->experimental = $branch === 'experimental';
-		$version->custom = false;
-		$version->ficsmas = $ficsmas;
-		$version->dataPath = $dataPath;
-		$version->baseVersion = null;
-		$version->recipeCostMultiplier = 1.0;
-		$version->powerCostMultiplier = 1.0;
-
-		return $version;
+		return $resolved;
 	}
 
-	private function buildName(string $buildId, string $branch, ?string $gameVersion, bool $ficsmas): string
+	private function report(SymfonyStyle $io, PublishOutcome $outcome): void
 	{
-		$name = $gameVersion ?? ('Build ' . $buildId);
+		$version = $outcome->version;
+		$io->writeln(sprintf(
+			'<info>%s</info> %s (%s)%s%s',
+			ucfirst($outcome->action),
+			$version->name,
+			$version->slug,
+			$outcome->removedSlug !== null ? sprintf(', merged away %s', $outcome->removedSlug) : '',
+			$outcome->detachedFrom !== null ? sprintf(', detached from %s', $outcome->detachedFrom) : '',
+		));
 
-		$qualifiers = [];
-		if ($branch === 'experimental') {
-			$qualifiers[] = 'Experimental';
+		if ($outcome->diff !== null && $outcome->comparedWith !== null) {
+			$io->writeln(sprintf('  Planner data vs %s: %d change(s)', $outcome->comparedWith, $outcome->diff['count']));
+			foreach ($outcome->diff['changes'] as $change) {
+				$io->writeln('    ' . $change);
+			}
 		}
-		if ($ficsmas) {
-			$qualifiers[] = 'FICSMAS';
-		}
-
-		return $qualifiers === [] ? $name : $name . ' (' . implode(', ', $qualifiers) . ')';
 	}
 
 	/** @param array<string, mixed>|null $worldData */
@@ -182,8 +222,9 @@ class PublishCommand extends Command
 				'ficsmas' => $ficsmas,
 				'importedAt' => $importedAt,
 			];
-			if ($worldData !== null) {
-				$metadata['world'] = $worldData;
+			$world = $worldData ?? ($data['metadata']['world'] ?? null);
+			if ($world !== null) {
+				$metadata['world'] = $world;
 			}
 			$data['metadata'] = $metadata;
 			$json = json_encode($data, self::JSON_FLAGS);
