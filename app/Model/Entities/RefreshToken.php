@@ -7,6 +7,7 @@ use Doctrine\ORM\Mapping as ORM;
 use greeny\SatisfactoryTools\Api\Model\Entities\Attributes\Identifier;
 
 #[ORM\Entity]
+#[ORM\Index(name: 'refresh_token_expires', columns: ['expires_at'])]
 class RefreshToken
 {
 
@@ -24,5 +25,9 @@ class RefreshToken
 
 	#[ORM\Column]
 	public DateTimeImmutable $createdAt;
+
+	/** Rotated tokens are kept for a while so that a reuse can be told from an unknown token. */
+	#[ORM\Column(nullable: true)]
+	public ?DateTimeImmutable $rotatedAt = null;
 
 }

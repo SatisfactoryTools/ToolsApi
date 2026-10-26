@@ -31,6 +31,44 @@ parameters:
 		lpSolveBin: '/usr/bin/lp_solve'
 		timeout: 30               # seconds before a calculation is aborted (504)
 
+	# Per client IP (IPv6 per /64). Counted in the rate_limit table; a request over the limit gets 429 + Retry-After.
+	# Login is counted per IP + login, and on top of that a login is locked out with a doubling delay
+	# (30 s up to 15 min) after 5 failed attempts in a row.
+	rateLimits:
+		login: {limit: 10, window: 900}
+		register: {limit: 5, window: 3600}
+		forgotPassword: {limit: 5, window: 3600}
+		oauthStart: {limit: 30, window: 600}
+		createVersion: {limit: 30, window: 3600}
+		worldData: {limit: 30, window: 600}         # generator runs only, cached results are free
+		anonymousShare: {limit: 30, window: 3600}   # shares sent as a tree; sharing your own stored plans is not limited
+		clientError: {limit: 60, window: 3600}
+		legacySolver: {limit: 60, window: 600}
+		legacyShareFetch: {limit: 30, window: 600}  # fetches from the old API only, stored shares are free
+
+	# Limits applied by RateLimitMiddleware before routing; the rest are checked in code where only some
+	# requests count (see rateLimits comments).
+	rateLimitRoutes:
+		register: 'POST /v1/auth/register'
+		forgotPassword: 'POST /v1/auth/forgot-password'
+		oauthStart: 'POST /v1/auth/oauth/*/start'
+		createVersion: 'POST /v1/versions'
+		clientError: 'POST /v1/errors'
+		legacySolver: 'POST /v1/legacy-solver'
+
+	quotas:
+		plans: 2000                 # per user, all versions together
+		folders: 1000               # per user, all versions together
+		mods: 50                    # per user
+		modVersions: 100            # per mod
+		customVersionsPerUser: 20   # custom versions a signed-in user ever created
+		customVersionsPerIp: 10     # custom versions created from one IP in the last 24 hours
+
+	requestBody:
+		maxBytes: 5242880           # 5 MB
+		overrides:
+			'POST /v1/help/editor/images': 8388608   # 4 MB screenshots arrive base64-encoded
+
 	jwt:
 		secret: %jwtSecret%
 		accessTokenTtl: 3600      # 1 hour

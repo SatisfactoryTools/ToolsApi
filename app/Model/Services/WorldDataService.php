@@ -17,6 +17,8 @@ class WorldDataService
 
 	private const array PURITIES = ['impure', 'normal', 'pure'];
 
+	private const int CACHE_LIFETIME = 7 * 86400;
+
 	public function __construct(
 		private readonly string $generatorBin,
 		private readonly string $worldFile,
@@ -26,8 +28,11 @@ class WorldDataService
 	{
 	}
 
-	/** @return array<string, mixed> */
-	public function generate(int $seed, string $mode = self::DEFAULT_MODE, string $purity = self::DEFAULT_PURITY): array
+	/**
+	 * @param (callable(): void)|null $beforeRun called only when the binary actually has to run, so a caller can rate-limit just that
+	 * @return array<string, mixed>
+	 */
+	public function generate(int $seed, string $mode = self::DEFAULT_MODE, string $purity = self::DEFAULT_PURITY, ?callable $beforeRun = null): array
 	{
 		if (!in_array($mode, self::MODES, true)) {
 			throw new WorldDataException('Unknown mode: ' . $mode);
@@ -47,6 +52,10 @@ class WorldDataService
 
 		// The endpoint is anonymous, so the per-key lock keeps a thundering herd from running the expensive binary in parallel.
 		if ($this->cacheDir === '') {
+			if ($beforeRun !== null) {
+				$beforeRun();
+			}
+
 			return $this->generateUncached($seed, $mode, $purity);
 		}
 
@@ -57,7 +66,11 @@ class WorldDataService
 			return $cached;
 		}
 
-		return $this->withLock($cacheFile . '.lock', function () use ($seed, $mode, $purity, $cacheFile): array {
+		if ($beforeRun !== null) {
+			$beforeRun();
+		}
+
+		$result = $this->withLock($cacheFile . '.lock', function () use ($seed, $mode, $purity, $cacheFile): array {
 			// Another request may have produced the result while we waited for the lock.
 			$cached = $this->readCache($cacheFile);
 			if ($cached !== null) {
@@ -69,6 +82,23 @@ class WorldDataService
 
 			return $result;
 		});
+
+		if (random_int(1, 50) === 1) {
+			$this->pruneCache();
+		}
+
+		return $result;
+	}
+
+	/** Every seed leaves a file behind, and the deploy only wipes temp/cache when it runs. */
+	private function pruneCache(): void
+	{
+		$cutoff = time() - self::CACHE_LIFETIME;
+		foreach (glob(rtrim($this->cacheDir, '/') . '/*') ?: [] as $file) {
+			if (is_file($file) && (int) @filemtime($file) < $cutoff) { // @ intentional
+				@unlink($file); // @ intentional
+			}
+		}
 	}
 
 	/** @return array<string, mixed> */

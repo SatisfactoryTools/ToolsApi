@@ -47,6 +47,11 @@ class ModRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['uuid' => $uuid]);
 	}
 
+	public function countByUser(User $user): int
+	{
+		return $this->getRepository()->count(['user' => $user]);
+	}
+
 	protected function getEntityClass(): string
 	{
 		return Mod::class;

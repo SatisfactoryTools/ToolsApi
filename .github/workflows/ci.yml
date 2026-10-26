@@ -5,6 +5,9 @@ on:
     pull_request:
     workflow_dispatch:
 
+permissions:
+    contents: read
+
 concurrency:
     group: ci-${{ github.ref }}
     cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
@@ -17,7 +20,7 @@ jobs:
         steps:
             -   uses: actions/checkout@v5
 
-            -   uses: shivammathur/setup-php@v2
+            -   uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
                 with:
                     php-version: '8.5'
                     extensions: curl, mysqli, json
@@ -69,11 +72,14 @@ jobs:
                 env:
                     DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
                     DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+                    DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
                 run: |
                     mkdir -p ~/.ssh
                     printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
                     chmod 600 ~/.ssh/id_deploy
-                    ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+                    # Pinned host key: a scan at deploy time would trust whatever answers on that address.
+                    test -n "$DEPLOY_KNOWN_HOSTS" || { echo "The DEPLOY_KNOWN_HOSTS secret is not set" >&2; exit 1; }
+                    printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts
                     printf 'Host deploy-target\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n' \
                       "$DEPLOY_HOST" "${{ secrets.DEPLOY_USER }}" >> ~/.ssh/config
 

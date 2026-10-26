@@ -7,7 +7,7 @@ class SteamProvider extends AbstractOAuthProvider
 {
 
 	private const OpenIdEndpoint = 'https://steamcommunity.com/openid/login';
-	private const ClaimedIdPrefix = 'https://steamcommunity.com/openid/id/';
+	private const ClaimedIdPattern = '~^https://steamcommunity\.com/openid/id/(\d{17})$~D';
 	private const PlayerSummariesUrl = 'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/';
 
 	public function __construct(
@@ -37,23 +37,73 @@ class SteamProvider extends AbstractOAuthProvider
 
 	public function fetchUserInfo(array $params, string $redirectUri): OAuthUserInfo
 	{
-		$claimedId = (string) ($params['openid_claimed_id'] ?? $params['openid.claimed_id'] ?? '');
-		if (!str_starts_with($claimedId, self::ClaimedIdPrefix)) {
-			throw new OAuthException('Steam did not return a valid claimed id');
-		}
+		$openId = $this->openIdParams($params);
 
-		$steamId = substr($claimedId, strlen(self::ClaimedIdPrefix));
-		if (!ctype_digit($steamId)) {
-			throw new OAuthException('Steam returned a malformed Steam ID');
-		}
-
-		if (!$this->verifyAssertion($params)) {
+		if (($openId['openid.op_endpoint'] ?? '') !== self::OpenIdEndpoint) {
 			throw new OAuthException('Steam authentication could not be verified');
 		}
 
+		$signed = explode(',', $openId['openid.signed'] ?? '');
+		foreach (['claimed_id', 'identity', 'return_to'] as $field) {
+			if (!in_array($field, $signed, true)) {
+				throw new OAuthException('Steam authentication could not be verified');
+			}
+		}
+
+		$claimedId = $openId['openid.claimed_id'] ?? '';
+		if (($openId['openid.identity'] ?? '') !== $claimedId || preg_match(self::ClaimedIdPattern, $claimedId, $match) !== 1) {
+			throw new OAuthException('Steam did not return a valid claimed id');
+		}
+
+		// The state travels outside the signature, so only an assertion Steam signed for this very callback and state counts.
+		if (!$this->returnsTo($openId['openid.return_to'] ?? '', $redirectUri, (string) ($params['state'] ?? ''))) {
+			throw new OAuthException('Steam authentication could not be verified');
+		}
+
+		if (!$this->verifyAssertion($openId)) {
+			throw new OAuthException('Steam authentication could not be verified');
+		}
+
+		$steamId = $match[1];
 		[$nickname, $avatarUrl] = $this->fetchProfile($steamId);
 
 		return new OAuthUserInfo($steamId, null, $nickname, $avatarUrl);
+	}
+
+	/**
+	 * Frontends may send `openid.ns` as `openid_ns`; both spellings are accepted, but one key given twice
+	 * must not let the identity and the verified assertion come from different values.
+	 * @param array<string, mixed> $params
+	 * @return array<string, string>
+	 */
+	private function openIdParams(array $params): array
+	{
+		$openId = [];
+		foreach ($params as $key => $value) {
+			$key = (string) $key;
+			$normalized = str_starts_with($key, 'openid_') ? 'openid.' . substr($key, 7) : $key;
+			if (!str_starts_with($normalized, 'openid.')) {
+				continue;
+			}
+			if (!is_string($value) || array_key_exists($normalized, $openId)) {
+				throw new OAuthException('Steam authentication could not be verified');
+			}
+			$openId[$normalized] = $value;
+		}
+
+		return $openId;
+	}
+
+	private function returnsTo(string $returnTo, string $redirectUri, string $state): bool
+	{
+		$separator = str_contains($redirectUri, '?') ? '&' : '?';
+		if ($state === '' || !str_starts_with($returnTo, $redirectUri . $separator)) {
+			return false;
+		}
+
+		parse_str((string) parse_url($returnTo, PHP_URL_QUERY), $query);
+
+		return is_string($query['state'] ?? null) && hash_equals($query['state'], $state);
 	}
 
 	/**
@@ -86,18 +136,11 @@ class SteamProvider extends AbstractOAuthProvider
 		];
 	}
 
-	/** @param array<string, mixed> $params */
-	private function verifyAssertion(array $params): bool
+	/** @param array<string, string> $openId */
+	private function verifyAssertion(array $openId): bool
 	{
-		$form = ['openid.mode' => 'check_authentication'];
-
-		foreach ($params as $key => $value) {
-			// Frontends often send `openid.ns` as `openid_ns`; accept both forms.
-			$normalized = str_starts_with($key, 'openid_') ? 'openid.' . substr($key, 7) : (string) $key;
-			if (str_starts_with($normalized, 'openid.') && $normalized !== 'openid.mode') {
-				$form[$normalized] = (string) $value;
-			}
-		}
+		unset($openId['openid.mode']);
+		$form = ['openid.mode' => 'check_authentication'] + $openId;
 
 		$response = $this->postFormRaw(self::OpenIdEndpoint, $form);
 

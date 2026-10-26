@@ -5,6 +5,7 @@ namespace greeny\SatisfactoryTools\Api\Model\Repositories;
 use greeny\SatisfactoryTools\Api\Model\Entities\Mod;
 use greeny\SatisfactoryTools\Api\Model\Entities\ModVersion;
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
+use greeny\SatisfactoryTools\Api\Model\Entities\VersionModVersion;
 use Ramsey\Uuid\UuidInterface;
 
 /** @extends BaseRepository<ModVersion> */
@@ -37,6 +38,27 @@ class ModVersionRepository extends BaseRepository
 			->setParameter('user', $user)
 			->getQuery()
 			->getOneOrNullResult();
+	}
+
+	public function countByMod(Mod $mod): int
+	{
+		return $this->getRepository()->count(['mod' => $mod]);
+	}
+
+	/** @param ModVersion[] $modVersions */
+	public function countVersionsUsing(array $modVersions): int
+	{
+		if ($modVersions === []) {
+			return 0;
+		}
+
+		return (int) $this->entityManager->createQueryBuilder()
+			->select('COUNT(DISTINCT link.version)')
+			->from(VersionModVersion::class, 'link')
+			->where('link.modVersion IN (:modVersions)')
+			->setParameter('modVersions', $modVersions)
+			->getQuery()
+			->getSingleScalarResult();
 	}
 
 	protected function getEntityClass(): string

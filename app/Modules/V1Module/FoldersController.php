@@ -15,6 +15,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use greeny\SatisfactoryTools\Api\Model\Repositories\FolderRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
+use greeny\SatisfactoryTools\Api\Model\Services\UserQuotas;
 use greeny\SatisfactoryTools\Api\Schema\Responses\FolderResponse;
 use Nette\Http\IResponse;
 
@@ -25,6 +26,7 @@ class FoldersController extends BaseV1Controller
 	public function __construct(
 		private readonly FolderRepository $folderRepository,
 		private readonly VersionRepository $versionRepository,
+		private readonly UserQuotas $quotas,
 	)
 	{
 	}
@@ -48,6 +50,13 @@ class FoldersController extends BaseV1Controller
 		}
 
 		$body = $this->parseBody($request);
+
+		$nameError = $this->nameError($body['name'] ?? '', 'name');
+		if ($nameError !== null) {
+			return $response->withStatus(IResponse::S400_BadRequest)
+				->writeJsonBody(['error' => $nameError]);
+		}
+
 		$id = trim((string) ($body['id'] ?? ''));
 		$name = trim((string) ($body['name'] ?? ''));
 		$data = (string) ($body['data'] ?? '{}');
@@ -66,15 +75,17 @@ class FoldersController extends BaseV1Controller
 
 		$parent = null;
 		if (isset($body['parent']) && $body['parent'] !== null) {
-			$parent = $this->folderRepository->getByUuidAndUserAndVersion(
-				\Ramsey\Uuid\Uuid::fromString((string) $body['parent']),
-				$user,
-				$version,
-			);
+			$parentUuid = $this->toUuid($body['parent']);
+			$parent = $parentUuid !== null ? $this->folderRepository->getByUuidAndUserAndVersion($parentUuid, $user, $version) : null;
 			if ($parent === null) {
 				return $response->withStatus(IResponse::S400_BadRequest)
 					->writeJsonBody(['error' => 'Parent folder not found']);
 			}
+		}
+
+		if ($this->folderRepository->countByUser($user) >= $this->quotas->folders) {
+			return $response->withStatus(IResponse::S403_Forbidden)
+				->writeJsonBody(['error' => 'You have reached the limit of ' . $this->quotas->folders . ' folders. Delete some folders to make room.']);
 		}
 
 		$folder = new Folder();
@@ -141,7 +152,12 @@ class FoldersController extends BaseV1Controller
 		}
 
 		if (isset($body['name'])) {
-			$name = trim((string) $body['name']);
+			$nameError = $this->nameError($body['name'], 'name');
+			if ($nameError !== null) {
+				return $response->withStatus(IResponse::S400_BadRequest)
+					->writeJsonBody(['error' => $nameError]);
+			}
+			$name = trim($body['name']);
 			if ($name === '') {
 				return $response->withStatus(IResponse::S400_BadRequest)
 					->writeJsonBody(['error' => 'Field name must not be empty']);
@@ -194,11 +210,8 @@ class FoldersController extends BaseV1Controller
 		}
 
 		if ($parentId !== null) {
-			$parent = $this->folderRepository->getByUuidAndUserAndVersion(
-				\Ramsey\Uuid\Uuid::fromString((string) $parentId),
-				$user,
-				$version,
-			);
+			$parentUuid = $this->toUuid($parentId);
+			$parent = $parentUuid !== null ? $this->folderRepository->getByUuidAndUserAndVersion($parentUuid, $user, $version) : null;
 			if ($parent === null) {
 				return $response->withStatus(IResponse::S400_BadRequest)
 					->writeJsonBody(['error' => 'Parent folder not found']);

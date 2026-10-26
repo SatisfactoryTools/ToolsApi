@@ -70,7 +70,7 @@ class DiscordErrorNotifier
 		$header = $repeat
 			? sprintf('**Error #%d again**: %d× since the last notice, %d× in total', $error->id, $error->count - $error->countAtNotification, $error->count)
 			: sprintf('**New error #%d**', $error->id);
-		$header .= sprintf(' · %s · %s', $error->app, $error->build);
+		$header .= sprintf(' · `%s` · `%s`', $this->inline($error->app) ?: '-', $this->inline($error->build) ?: '-');
 
 		$message = '`' . $this->inline(mb_substr($error->message, 0, 300)) . '`';
 		$room = self::MessageLimit - mb_strlen($header) - mb_strlen($message) - 20;

@@ -7,7 +7,7 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use greeny\SatisfactoryTools\Api\Model\Entities\ClientError;
 use greeny\SatisfactoryTools\Api\Model\Repositories\ClientErrorRepository;
 
-/** The endpoint is anonymous, so the hourly caps bound what a flood of made-up errors can do to the table and the channel. */
+/** The endpoint is anonymous: the per-IP limit (RateLimitMiddleware) slows one sender down, and the hourly caps bound what a flood from many can do to the table and the channel. */
 class ClientErrorService
 {
 
@@ -17,6 +17,9 @@ class ClientErrorService
 
 	/** A known error is mentioned again once a day while it keeps happening. */
 	private const string RepeatNoticeAfter = '-1 day';
+
+	/** Errors not seen for this long are deleted. */
+	private const string RetainFor = '-90 days';
 
 	public function __construct(
 		private readonly ClientErrorRepository $repository,
@@ -38,14 +41,19 @@ class ClientErrorService
 			$error = new ClientError();
 			$error->signature = $signature;
 			$error->message = $message;
+			// Only the first report's details are kept: anyone can post a known message again with made-up details.
+			$error->details = $details;
+			$error->app = $app;
+			$error->build = $build;
 			$error->firstSeenAt = $now;
 		} else {
 			$error->count++;
 		}
-		$error->details = $details;
-		$error->app = $app;
-		$error->build = $build;
 		$error->lastSeenAt = $now;
+
+		if (random_int(1, 100) === 1) {
+			$this->repository->deleteLastSeenBefore($now->modify(self::RetainFor));
+		}
 
 		try {
 			$this->repository->save($error);

@@ -2,6 +2,7 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Entities;
 
+use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -10,6 +11,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\Attributes\Uuid;
 
 #[ORM\Entity]
 #[ORM\HasLifecycleCallbacks]
+#[ORM\Index(name: 'version_created_from_ip', columns: ['created_from_ip', 'created_at'])]
 class Version
 {
 
@@ -63,6 +65,17 @@ class Version
 
 	#[ORM\Column(length: 64, nullable: true)]
 	public ?string $plannerHash = null;
+
+	/** Who created a custom version, for the per-user and per-IP creation caps; unset on versions from before the caps. */
+	#[ORM\ManyToOne(targetEntity: User::class)]
+	#[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+	public ?User $createdBy = null;
+
+	#[ORM\Column(length: 64, nullable: true)]
+	public ?string $createdFromIp = null;
+
+	#[ORM\Column(nullable: true)]
+	public ?DateTimeImmutable $createdAt = null;
 
 	/** @var Collection<int, VersionBuild> */
 	#[ORM\OneToMany(mappedBy: 'version', targetEntity: VersionBuild::class, cascade: ['persist'])]

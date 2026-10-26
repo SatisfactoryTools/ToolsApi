@@ -60,6 +60,7 @@ Set these repository **secrets**:
 | --- | --- |
 | `DEPLOY_SSH_KEY` | Private key of the deploy user (the public half goes in its `authorized_keys`) |
 | `DEPLOY_HOST` | Server hostname |
+| `DEPLOY_KNOWN_HOSTS` | The server's SSH host key line(s), e.g. the output of `ssh-keyscan -H <host>` checked against the server's own fingerprint; the deploy refuses to run without it |
 | `DEPLOY_USER` | SSH user |
 | `DEPLOY_PATH` | Project root on the server - the Apache document root is `$DEPLOY_PATH/www` |
 
@@ -115,8 +116,11 @@ Authentication
 --------------
 
 - **Access token**: HS256 JWT, 1 h TTL, sent as `Authorization: Bearer <token>`.
-- **Refresh token**: opaque 64-char string stored in the DB (revocable), 30 day TTL,
-  rotated on every use.
+- **Refresh token**: opaque 64-char string, stored as its SHA-256 (revocable), 30 day TTL,
+  rotated on every use. A rotated token is kept for 7 days: presenting it again within 60 seconds
+  of its rotation (two tabs refreshing at once) just issues another pair, later it revokes every
+  refresh token of that account. Password reset tokens are stored hashed too.
+- **Login throttling**: see "Rate limits" below.
 
 `JwtMiddleware` validates the bearer token and exposes the `User` on the request
 attribute `user` (or `null` when no token is present); an invalid token returns `401`.
@@ -164,10 +168,12 @@ Endpoints (v1)
   `temp/cache`; image URLs are built from the `publicApiUrl` parameter. Text rules are
   tested by `php tests/MetaTextTest.php`.
 - `POST /v1/errors` - an error the frontend caught (`{message, details, app, build}`, public, no auth).
-  Stored in `client_error`, one row per message (repeats bump `count` and replace `details`). A new
+  Stored in `client_error`, one row per message (repeats bump `count`; `details`, `app` and `build` stay those
+  of the first report, so they cannot be overwritten by anyone posting a known message). Rows not seen for 90
+  days are deleted. A new
   message is posted to the Discord channel `errorReportDiscordChannelId` by the supporter bot (needs View
   Channel + Send Messages there), and again at most once a day while it keeps happening. Capped at 200
-  new messages and 20 Discord posts an hour.
+  new messages and 20 Discord posts an hour, and at 60 reports per IP an hour.
 
 Supporters
 ----------
@@ -207,6 +213,23 @@ Credentials go in `local.neon` (see `local.template.neon`):
 - **Discord**: a bot invited with Manage Roles, its role above the supporter role; the bot token, server
   id and role id. A supporter who is not in the server yet gets the role on a later sync.
 
+Rate limits and quotas
+----------------------
+
+Counters live in the `rate_limit` table (keyed by a hash of limit name + client IP, IPv6 per /64);
+a request over a limit gets `429` with `Retry-After`. The limits are the `rateLimits` parameter in
+`config/common.neon`; `rateLimitRoutes` lists the ones applied to whole endpoints by
+`RateLimitMiddleware`, the others are counted in code where only some requests cost anything
+(world-data generator runs, fetches from the old API, shares sent as a tree, login per IP + login).
+On top of that a login is locked out with a doubling delay (30 s up to 15 min) after 5 failed attempts
+in a row. The client IP is `REMOTE_ADDR` - if the API ever moves behind a proxy or CDN, the
+limiter must learn to read the forwarded address or everyone shares one counter.
+
+`quotas` caps what one account can store (plans, folders, mods, versions per mod, custom versions
+ever created) and how many custom versions one IP may create in 24 hours; going over answers `403`
+(or `429` for the per-IP cap). `requestBody.maxBytes` (5 MB) caps every request body, with
+per-endpoint `overrides`.
+
 Desktop sign-in
 ---------------
 
@@ -224,6 +247,12 @@ signs in by polling:
    `{"desktop": true, "provider": "...", "linked": false}` so the page can tell the user to
    go back to the app. A failed exchange still answers `400` there. The state is
    single-use: a second callback gets `Invalid or expired OAuth state`.
+   The desktop `/start` response also carries a short `confirmCode` the app shows. The browser's
+   first `/callback` without it gets `409 {"confirmRequired": true}` and the page asks for the code;
+   the callback is then posted again with `confirmCode`. Without that step anyone could start a
+   flow, send the provider link to someone and collect their tokens by polling. Five wrong codes
+   end the flow. The page also offers to hand the callback to the app over `sftools://`; the app
+   posts it with the code itself when it recognises the state.
 3. Meanwhile the app polls `POST /v1/auth/oauth/desktop/poll` with
    `{"state": "...", "pollToken": "..."}` (no auth): `202 {"pending": true}` until the
    browser is done, then the stored body once - `200`, or `400 {"error": ...}` - and the
@@ -290,7 +319,9 @@ the `legacy_share` table does not exist at all - and `legacyShareSourceUrl` is s
 controller fetches `{legacyShareSourceUrl}{slug}/` from the old API (10 s timeout), unwraps
 its `{"code": 200, "data": {...}}` envelope and answers with the `data` object in the same
 shape as a stored share. The old API's `404` is a `404` here; any other failure there (down,
-timeout, unexpected body) is a `502` with `{"error": ..., "detail": ...}`. A document fetched
+timeout, unexpected body) is a `502` with `{"error": ...}` (the cause goes to the log). A slug the
+old API did not know is remembered for an hour (`temp/cache/legacy-share-misses`), and fetches are
+rate-limited per IP; the response may be at most 1 MB. A document fetched
 this way is also stored as a `legacy_share` row when the table exists (a failure to store is
 logged and does not fail the response), so the next request is served locally and the
 eventual import finds the row unchanged. The parameter lives in `config/common.neon`:

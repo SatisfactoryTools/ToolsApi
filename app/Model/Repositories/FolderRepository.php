@@ -27,6 +27,11 @@ class FolderRepository extends BaseRepository
 		return $this->getRepository()->count(['version' => $version]);
 	}
 
+	public function countByUser(User $user): int
+	{
+		return $this->getRepository()->count(['user' => $user]);
+	}
+
 	protected function getEntityClass(): string
 	{
 		return Folder::class;

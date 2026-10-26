@@ -10,6 +10,7 @@ use Apitte\Core\Http\ApiResponse;
 use Apitte\Core\Schema\EndpointParameter;
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Services\AuthException;
+use greeny\SatisfactoryTools\Api\Model\Services\OAuth\OAuthConfirmationRequired;
 use greeny\SatisfactoryTools\Api\Model\Services\OAuth\OAuthService;
 use greeny\SatisfactoryTools\Api\Schema\Responses\Auth\TokenResponse;
 use Nette\Http\IResponse;
@@ -67,11 +68,23 @@ class OAuthController extends BaseV1Controller
 			return $this->notFound($response);
 		}
 
+		/** @var User|null $user */
+		$user = $request->getAttribute('user');
+
 		$body = $this->parseBody($request);
 		$params = isset($body['params']) && is_array($body['params']) ? $body['params'] : $body;
 
 		try {
-			$result = $this->oauthService->handleCallback($provider, $params);
+			$result = $this->oauthService->handleCallback(
+				$provider,
+				$params,
+				$user,
+				($body['startedHere'] ?? false) === true,
+				is_string($body['confirmCode'] ?? null) ? $body['confirmCode'] : '',
+			);
+		} catch (OAuthConfirmationRequired) {
+			return $response->withStatus(IResponse::S409_Conflict)
+				->writeJsonBody(['confirmRequired' => true, 'provider' => $provider]);
 		} catch (AuthException $e) {
 			return $response->withStatus(IResponse::S400_BadRequest)
 				->writeJsonBody(['error' => $e->getMessage()]);

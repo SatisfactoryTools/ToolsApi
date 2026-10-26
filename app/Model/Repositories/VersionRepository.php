@@ -2,6 +2,7 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Repositories;
 
+use DateTimeImmutable;
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use Ramsey\Uuid\Uuid;
@@ -56,6 +57,27 @@ class VersionRepository extends BaseRepository
 	public function getByDefinitionHash(string $definitionHash): ?Version
 	{
 		return $this->getRepository()->findOneBy(['definitionHash' => $definitionHash]);
+	}
+
+	public function countCreatedBy(User $user): int
+	{
+		return $this->getRepository()->count(['createdBy' => $user]);
+	}
+
+	/** @return list<DateTimeImmutable> oldest first */
+	public function getCreationTimesFromIpSince(string $ipHash, DateTimeImmutable $since): array
+	{
+		$rows = $this->getRepository()->createQueryBuilder('v')
+			->select('v.createdAt')
+			->where('v.createdFromIp = :ip')
+			->andWhere('v.createdAt >= :since')
+			->setParameter('ip', $ipHash)
+			->setParameter('since', $since)
+			->orderBy('v.createdAt', 'ASC')
+			->getQuery()
+			->getArrayResult();
+
+		return array_map(static fn (array $row): DateTimeImmutable => $row['createdAt'], $rows);
 	}
 
 	public function getLatestOfficial(bool $experimental, bool $ficsmas): ?Version

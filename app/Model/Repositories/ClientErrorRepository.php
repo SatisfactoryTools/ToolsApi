@@ -24,6 +24,16 @@ class ClientErrorRepository extends BaseRepository
 		return $this->countWhere('notifiedAt', $since);
 	}
 
+	public function deleteLastSeenBefore(DateTimeImmutable $before): void
+	{
+		$this->entityManager->createQueryBuilder()
+			->delete(ClientError::class, 'e')
+			->where('e.lastSeenAt < :before')
+			->setParameter('before', $before)
+			->getQuery()
+			->execute();
+	}
+
 	private function countWhere(string $field, DateTimeImmutable $since): int
 	{
 		return (int) $this->getRepository()->createQueryBuilder('e')

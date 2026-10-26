@@ -59,6 +59,11 @@ class PlanRepository extends BaseRepository
 		return $summary;
 	}
 
+	public function countByUser(User $user): int
+	{
+		return $this->getRepository()->count(['user' => $user]);
+	}
+
 	protected function getEntityClass(): string
 	{
 		return Plan::class;

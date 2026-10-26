@@ -116,7 +116,8 @@ class ProductionSolver
 		$optimise = [];
 		if ($type === self::TYPE_MAX) {
 			foreach ($request->production as $production) {
-				if ($production->item && $production->type === self::TYPE_MAX) {
+				// The item goes into the lp_solve model text verbatim, so only known item class names may get there.
+				if ($production->item && isset($schema->items[$production->item]) && $production->type === self::TYPE_MAX) {
 					$rows[] = '1' . $production->item . '#Product - Maximise#Product = 0;';
 				}
 			}

@@ -8,6 +8,9 @@ use Apitte\Core\Http\ApiRequest;
 use Apitte\Core\Http\ApiResponse;
 use greeny\SatisfactoryTools\Api\Model\Services\AuthException;
 use greeny\SatisfactoryTools\Api\Model\Services\AuthService;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\ClientIp;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\RateLimiter;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\RateLimitExceeded;
 use greeny\SatisfactoryTools\Api\Schema\Responses\Auth\TokenResponse;
 use Nette\Http\IResponse;
 
@@ -15,8 +18,12 @@ use Nette\Http\IResponse;
 class AuthController extends BaseV1Controller
 {
 
+	private const int LOGIN_MAX_LENGTH = 64;
+	private const int EMAIL_MAX_LENGTH = 255;
+
 	public function __construct(
 		private readonly AuthService $authService,
+		private readonly RateLimiter $rateLimiter,
 	)
 	{
 	}
@@ -36,7 +43,12 @@ class AuthController extends BaseV1Controller
 				->writeJsonBody(['error' => 'Fields login, email and password are required']);
 		}
 
-		if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+		if (mb_strlen($login) > self::LOGIN_MAX_LENGTH) {
+			return $response->withStatus(IResponse::S400_BadRequest)
+				->writeJsonBody(['error' => 'Login may be at most ' . self::LOGIN_MAX_LENGTH . ' characters long']);
+		}
+
+		if (mb_strlen($email) > self::EMAIL_MAX_LENGTH || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 			return $response->withStatus(IResponse::S400_BadRequest)
 				->writeJsonBody(['error' => 'Invalid email address']);
 		}
@@ -72,7 +84,12 @@ class AuthController extends BaseV1Controller
 		}
 
 		try {
+			$this->rateLimiter->hit('login', ClientIp::of($request) . '|' . mb_strtolower($login));
 			$tokens = $this->authService->login($login, $password);
+		} catch (RateLimitExceeded $e) {
+			return $response->withStatus(IResponse::S429_TooManyRequests)
+				->withHeader('Retry-After', (string) $e->retryAfter)
+				->writeJsonBody(['error' => $e->getMessage()]);
 		} catch (AuthException) {
 			return $response->withStatus(IResponse::S401_Unauthorized)
 				->writeJsonBody(['error' => 'Invalid credentials']);

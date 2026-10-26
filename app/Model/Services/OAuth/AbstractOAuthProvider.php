@@ -3,11 +3,19 @@
 namespace greeny\SatisfactoryTools\Api\Model\Services\OAuth;
 
 use JsonException;
+use Psr\Log\LoggerInterface;
 
 abstract class AbstractOAuthProvider implements OAuthProviderInterface
 {
 
 	private const UserAgent = 'SatisfactoryTools-API';
+
+	private ?LoggerInterface $logger = null;
+
+	public function setLogger(LoggerInterface $logger): void
+	{
+		$this->logger = $logger;
+	}
 
 	/**
 	 * @param array<string, string> $form
@@ -85,12 +93,15 @@ abstract class AbstractOAuthProvider implements OAuthProviderInterface
 		$status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
 		// No curl_close(): CurlHandle frees itself, and the call is deprecated since PHP 8.5.
 
+		// The details go to the log only: they describe our server's network, not anything the user can act on.
 		if ($errno !== 0 || !is_string($response)) {
-			throw new OAuthException('Could not reach provider ' . $this->getKey() . ': ' . $error);
+			$this->logger?->warning(sprintf('Could not reach provider %s: %s', $this->getKey(), $error));
+			throw new OAuthException('Could not reach ' . ucfirst($this->getKey()) . '. Please try again later.');
 		}
 
 		if ($status >= 400) {
-			throw new OAuthException('Provider ' . $this->getKey() . ' returned HTTP ' . $status);
+			$this->logger?->warning(sprintf('Provider %s answered HTTP %d for %s', $this->getKey(), $status, strtok($url, '?')));
+			throw new OAuthException(ucfirst($this->getKey()) . ' refused the sign-in. Please try again.');
 		}
 
 		return $response;

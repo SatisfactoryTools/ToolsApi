@@ -55,6 +55,26 @@ class UserRepository extends BaseRepository
 		return $ids === [] ? [] : $this->getRepository()->findBy(['id' => $ids]);
 	}
 
+	/**
+	 * Login and email are only checked for uniqueness before the insert, so concurrent sign-ups would otherwise
+	 * collide on the unique index (a failed flush also closes the entity manager, so it cannot be retried).
+	 * @template T
+	 * @param callable(): T $callback
+	 * @return T
+	 */
+	public function withAccountLock(callable $callback): mixed
+	{
+		$connection = $this->entityManager->getConnection();
+		$locked = (int) $connection->fetchOne("SELECT GET_LOCK('sftools-account-create', 10)") === 1;
+		try {
+			return $callback();
+		} finally {
+			if ($locked) {
+				$connection->fetchOne("SELECT RELEASE_LOCK('sftools-account-create')");
+			}
+		}
+	}
+
 	protected function getEntityClass(): string
 	{
 		return User::class;

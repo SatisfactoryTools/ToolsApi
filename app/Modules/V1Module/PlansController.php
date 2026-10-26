@@ -17,6 +17,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use greeny\SatisfactoryTools\Api\Model\Repositories\FolderRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
+use greeny\SatisfactoryTools\Api\Model\Services\UserQuotas;
 use greeny\SatisfactoryTools\Api\Schema\Responses\PlanResponse;
 use Nette\Http\IResponse;
 use Ramsey\Uuid\Uuid;
@@ -29,6 +30,7 @@ class PlansController extends BaseV1Controller
 		private readonly PlanRepository $planRepository,
 		private readonly VersionRepository $versionRepository,
 		private readonly FolderRepository $folderRepository,
+		private readonly UserQuotas $quotas,
 	)
 	{
 	}
@@ -77,6 +79,12 @@ class PlansController extends BaseV1Controller
 
 		$body = $this->parseBody($request);
 
+		$nameError = $this->nameError($body['name'] ?? '', 'name');
+		if ($nameError !== null) {
+			return $response->withStatus(IResponse::S400_BadRequest)
+				->writeJsonBody(['error' => $nameError]);
+		}
+
 		$id = trim((string) ($body['id'] ?? ''));
 		$name = trim((string) ($body['name'] ?? ''));
 		$data = (string) ($body['data'] ?? '{}');
@@ -101,11 +109,8 @@ class PlansController extends BaseV1Controller
 
 		$folder = null;
 		if (isset($body['folder']) && $body['folder'] !== null) {
-			$folder = $this->folderRepository->getByUuidAndUserAndVersion(
-				Uuid::fromString((string) $body['folder']),
-				$user,
-				$version,
-			);
+			$folderUuid = $this->toUuid($body['folder']);
+			$folder = $folderUuid !== null ? $this->folderRepository->getByUuidAndUserAndVersion($folderUuid, $user, $version) : null;
 			if ($folder === null) {
 				return $response->withStatus(IResponse::S400_BadRequest)
 					->writeJsonBody(['error' => 'Folder not found']);
@@ -114,15 +119,17 @@ class PlansController extends BaseV1Controller
 
 		$parent = null;
 		if (isset($body['parent']) && $body['parent'] !== null) {
-			$parent = $this->planRepository->getByUuidAndUserAndVersion(
-				Uuid::fromString((string) $body['parent']),
-				$user,
-				$version,
-			);
+			$parentUuid = $this->toUuid($body['parent']);
+			$parent = $parentUuid !== null ? $this->planRepository->getByUuidAndUserAndVersion($parentUuid, $user, $version) : null;
 			if ($parent === null) {
 				return $response->withStatus(IResponse::S400_BadRequest)
 					->writeJsonBody(['error' => 'Parent plan not found']);
 			}
+		}
+
+		if ($this->planRepository->countByUser($user) >= $this->quotas->plans) {
+			return $response->withStatus(IResponse::S403_Forbidden)
+				->writeJsonBody(['error' => 'You have reached the limit of ' . $this->quotas->plans . ' plans. Delete some plans to make room.']);
 		}
 
 		$plan = new Plan();
@@ -228,7 +235,12 @@ class PlansController extends BaseV1Controller
 		}
 
 		if (isset($body['name'])) {
-			$plan->name = $body['name'];
+			$nameError = $this->nameError($body['name'], 'name');
+			if ($nameError !== null) {
+				return $response->withStatus(IResponse::S400_BadRequest)
+					->writeJsonBody(['error' => $nameError]);
+			}
+			$plan->name = trim($body['name']);
 		}
 
 		if (array_key_exists('description', $body)) {
@@ -295,11 +307,8 @@ class PlansController extends BaseV1Controller
 				return $response->withStatus(IResponse::S400_BadRequest)
 					->writeJsonBody(['error' => 'Field parent must not be null (use folder: null to move to root)']);
 			}
-			$parent = $this->planRepository->getByUuidAndUserAndVersion(
-				Uuid::fromString((string) $body['parent']),
-				$user,
-				$version,
-			);
+			$parentUuid = $this->toUuid($body['parent']);
+			$parent = $parentUuid !== null ? $this->planRepository->getByUuidAndUserAndVersion($parentUuid, $user, $version) : null;
 			if ($parent === null) {
 				return $response->withStatus(IResponse::S400_BadRequest)
 					->writeJsonBody(['error' => 'Parent plan not found']);
@@ -311,11 +320,8 @@ class PlansController extends BaseV1Controller
 			$plan->parent = $parent;
 			$plan->folder = null;
 		} elseif ($body['folder'] !== null) {
-			$folder = $this->folderRepository->getByUuidAndUserAndVersion(
-				Uuid::fromString((string) $body['folder']),
-				$user,
-				$version,
-			);
+			$folderUuid = $this->toUuid($body['folder']);
+			$folder = $folderUuid !== null ? $this->folderRepository->getByUuidAndUserAndVersion($folderUuid, $user, $version) : null;
 			if ($folder === null) {
 				return $response->withStatus(IResponse::S400_BadRequest)
 					->writeJsonBody(['error' => 'Folder not found']);

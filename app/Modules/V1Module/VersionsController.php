@@ -8,6 +8,7 @@ use Apitte\Core\Annotation\Controller\RequestParameter;
 use Apitte\Core\Http\ApiRequest;
 use Apitte\Core\Http\ApiResponse;
 use Apitte\Core\Schema\EndpointParameter;
+use DateTimeImmutable;
 use greeny\SatisfactoryTools\Api\Model\Entities\ModVersion;
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
@@ -16,11 +17,16 @@ use greeny\SatisfactoryTools\Api\Model\Repositories\ModVersionRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
 use greeny\SatisfactoryTools\Api\Model\Services\CustomVersionFileService;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\ClientIp;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\RateLimiter;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\RateLimitExceeded;
+use greeny\SatisfactoryTools\Api\Model\Services\UserQuotas;
 use greeny\SatisfactoryTools\Api\Model\Services\WorldDataException;
 use greeny\SatisfactoryTools\Api\Model\Services\WorldDataService;
 use greeny\SatisfactoryTools\Api\Schema\Responses\VersionResponse;
 use Nette\Http\IResponse;
 use Nette\Utils\Random;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
 #[Path('/versions')]
@@ -43,6 +49,9 @@ class VersionsController extends BaseV1Controller
 		private readonly PlanRepository $planRepository,
 		private readonly CustomVersionFileService $fileService,
 		private readonly WorldDataService $worldDataService,
+		private readonly UserQuotas $quotas,
+		private readonly RateLimiter $rateLimiter,
+		private readonly LoggerInterface $logger,
 	)
 	{
 	}
@@ -75,11 +84,23 @@ class VersionsController extends BaseV1Controller
 				->writeJsonBody(['error' => 'Field purity is invalid', 'allowed' => WorldDataService::PURITY_SETTINGS]);
 		}
 
+		$ip = ClientIp::of($request);
 		try {
-			$data = $this->worldDataService->generate($seed, $mode, $purity);
+			$data = $this->worldDataService->generate(
+				$seed,
+				$mode,
+				$purity,
+				fn () => $this->rateLimiter->hit('worldData', $ip),
+			);
+		} catch (RateLimitExceeded $e) {
+			return $response->withStatus(IResponse::S429_TooManyRequests)
+				->withHeader('Retry-After', (string) $e->retryAfter)
+				->writeJsonBody(['error' => $e->getMessage()]);
 		} catch (WorldDataException $e) {
+			$this->logger->warning('World data generation failed: ' . $e->getMessage(), ['exception' => $e]);
+
 			return $response->withStatus(IResponse::S502_BadGateway)
-				->writeJsonBody(['error' => 'Could not generate world data', 'detail' => $e->getMessage()]);
+				->writeJsonBody(['error' => 'Could not generate world data']);
 		}
 
 		return $response->writeJsonBody($data);
@@ -273,12 +294,13 @@ class VersionsController extends BaseV1Controller
 		}
 
 		$definitionHash = $this->fileService->definitionHash($name, $base, $modVersions, $recipeCost, $powerCost, $worldData);
+		$ipHash = hash('sha256', 'custom-version|' . ClientIp::of($request));
 
 		// Locked so concurrent identical requests don't both miss the lookup and collide on the unique definitionHash.
-		/** @var array{Version, bool} [$version, $created] */
-		[$version, $created] = $this->fileService->withLock(
+		/** @var array{Version, bool}|ApiResponse $outcome */
+		$outcome = $this->fileService->withLock(
 			'definition-' . $definitionHash,
-			function () use ($user, $base, $name, $recipeCost, $powerCost, $modVersions, $worldData, $definitionHash): array {
+			function () use ($response, $user, $ipHash, $base, $name, $recipeCost, $powerCost, $modVersions, $worldData, $definitionHash): array|ApiResponse {
 				$existing = $this->versionRepository->getByDefinitionHash($definitionHash);
 				if ($existing !== null) {
 					$changed = $this->fileService->ensureFile($existing);
@@ -291,6 +313,11 @@ class VersionsController extends BaseV1Controller
 					}
 
 					return [$existing, false];
+				}
+
+				$refusal = $this->creationRefusal($response, $user, $ipHash);
+				if ($refusal !== null) {
+					return $refusal;
 				}
 
 				$version = new Version();
@@ -315,6 +342,9 @@ class VersionsController extends BaseV1Controller
 				if ($user !== null) {
 					$version->users->add($user);
 				}
+				$version->createdBy = $user;
+				$version->createdFromIp = $ipHash;
+				$version->createdAt = new DateTimeImmutable();
 
 				$this->fileService->ensureFile($version);
 				$this->versionRepository->save($version);
@@ -323,8 +353,34 @@ class VersionsController extends BaseV1Controller
 			},
 		);
 
+		if ($outcome instanceof ApiResponse) {
+			return $outcome;
+		}
+		[$version, $created] = $outcome;
+
 		return $response->withStatus($created ? IResponse::S201_Created : IResponse::S200_OK)
 			->writeJsonBody(VersionResponse::fromEntity($version)->toArray());
+	}
+
+	/** Only new versions count: each one writes a few MB of data, while picking an existing one costs nothing. */
+	private function creationRefusal(ApiResponse $response, ?User $user, string $ipHash): ?ApiResponse
+	{
+		if ($user !== null && $this->versionRepository->countCreatedBy($user) >= $this->quotas->customVersionsPerUser) {
+			return $response->withStatus(IResponse::S403_Forbidden)
+				->writeJsonBody(['error' => 'You have reached the limit of ' . $this->quotas->customVersionsPerUser . ' custom versions.']);
+		}
+
+		$now = new DateTimeImmutable();
+		$recent = $this->versionRepository->getCreationTimesFromIpSince($ipHash, $now->modify('-1 day'));
+		if (count($recent) >= $this->quotas->customVersionsPerIp) {
+			$retryAfter = max(1, $recent[count($recent) - $this->quotas->customVersionsPerIp]->modify('+1 day')->getTimestamp() - $now->getTimestamp());
+
+			return $response->withStatus(IResponse::S429_TooManyRequests)
+				->withHeader('Retry-After', (string) $retryAfter)
+				->writeJsonBody(['error' => 'Too many custom versions were created from your network today. Please try again later.']);
+		}
+
+		return null;
 	}
 
 	#[Path('/link')]

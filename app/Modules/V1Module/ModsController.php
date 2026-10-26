@@ -15,6 +15,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Repositories\ModRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\ModVersionRepository;
 use greeny\SatisfactoryTools\Api\Model\Services\ModDataStorage;
+use greeny\SatisfactoryTools\Api\Model\Services\UserQuotas;
 use greeny\SatisfactoryTools\Api\Schema\Responses\ModResponse;
 use greeny\SatisfactoryTools\Api\Schema\Responses\ModVersionResponse;
 use Nette\Http\IResponse;
@@ -28,6 +29,7 @@ class ModsController extends BaseV1Controller
 		private readonly ModRepository $modRepository,
 		private readonly ModVersionRepository $modVersionRepository,
 		private readonly ModDataStorage $modDataStorage,
+		private readonly UserQuotas $quotas,
 	)
 	{
 	}
@@ -79,10 +81,20 @@ class ModsController extends BaseV1Controller
 		}
 
 		$body = $this->parseBody($request);
+		$nameError = $this->nameError($body['name'] ?? '', 'name');
+		if ($nameError !== null) {
+			return $response->withStatus(IResponse::S400_BadRequest)
+				->writeJsonBody(['error' => $nameError]);
+		}
 		$name = trim((string) ($body['name'] ?? ''));
 		if ($name === '') {
 			return $response->withStatus(IResponse::S400_BadRequest)
 				->writeJsonBody(['error' => 'Field name is required']);
+		}
+
+		if ($this->modRepository->countByUser($user) >= $this->quotas->mods) {
+			return $response->withStatus(IResponse::S403_Forbidden)
+				->writeJsonBody(['error' => 'You have reached the limit of ' . $this->quotas->mods . ' mods.']);
 		}
 
 		$mod = new Mod();
@@ -116,7 +128,12 @@ class ModsController extends BaseV1Controller
 		$body = $this->parseBody($request);
 
 		if (isset($body['name'])) {
-			$name = trim((string) $body['name']);
+			$nameError = $this->nameError($body['name'], 'name');
+			if ($nameError !== null) {
+				return $response->withStatus(IResponse::S400_BadRequest)
+					->writeJsonBody(['error' => $nameError]);
+			}
+			$name = trim($body['name']);
 			if ($name === '') {
 				return $response->withStatus(IResponse::S400_BadRequest)
 					->writeJsonBody(['error' => 'Field name must not be empty']);
@@ -149,12 +166,16 @@ class ModsController extends BaseV1Controller
 				->writeJsonBody(['error' => 'Mod not found']);
 		}
 
-		// Remove the data files; the DB rows cascade when the mod is deleted.
-		foreach ($mod->versions as $version) {
-			$this->modDataStorage->delete($version->dataPath);
+		$modVersions = $mod->versions->toArray();
+		if ($this->modVersionRepository->countVersionsUsing($modVersions) > 0) {
+			return $this->usedByVersions($response, 'This mod');
 		}
 
+		// Files go only once the rows are gone, so a failed delete never leaves rows pointing at missing files.
 		$this->modRepository->delete($mod);
+		foreach ($modVersions as $modVersion) {
+			$this->modDataStorage->delete($modVersion->dataPath);
+		}
 
 		return $response->withStatus(IResponse::S204_NoContent);
 	}
@@ -176,10 +197,20 @@ class ModsController extends BaseV1Controller
 		}
 
 		$body = $this->parseBody($request);
+		$nameError = $this->nameError($body['name'] ?? '', 'name');
+		if ($nameError !== null) {
+			return $response->withStatus(IResponse::S400_BadRequest)
+				->writeJsonBody(['error' => $nameError]);
+		}
 		$name = trim((string) ($body['name'] ?? ''));
 		if ($name === '') {
 			return $response->withStatus(IResponse::S400_BadRequest)
 				->writeJsonBody(['error' => 'Field name is required']);
+		}
+
+		if ($this->modVersionRepository->countByMod($mod) >= $this->quotas->modVersions) {
+			return $response->withStatus(IResponse::S403_Forbidden)
+				->writeJsonBody(['error' => 'A mod can have at most ' . $this->quotas->modVersions . ' versions.']);
 		}
 
 		if (array_key_exists('data', $body) && $body['data'] !== null && !is_array($body['data'])) {
@@ -229,7 +260,12 @@ class ModsController extends BaseV1Controller
 		$body = $this->parseBody($request);
 
 		if (isset($body['name'])) {
-			$name = trim((string) $body['name']);
+			$nameError = $this->nameError($body['name'], 'name');
+			if ($nameError !== null) {
+				return $response->withStatus(IResponse::S400_BadRequest)
+					->writeJsonBody(['error' => $nameError]);
+			}
+			$name = trim($body['name']);
 			if ($name === '') {
 				return $response->withStatus(IResponse::S400_BadRequest)
 					->writeJsonBody(['error' => 'Field name must not be empty']);
@@ -239,6 +275,9 @@ class ModsController extends BaseV1Controller
 
 		if (array_key_exists('data', $body)) {
 			if ($body['data'] === null) {
+				if ($modVersion->dataPath !== null && $this->modVersionRepository->countVersionsUsing([$modVersion]) > 0) {
+					return $this->usedByVersions($response, 'The data of this mod version');
+				}
 				$this->modDataStorage->delete($modVersion->dataPath);
 				$modVersion->dataPath = null;
 			} elseif (is_array($body['data'])) {
@@ -277,8 +316,13 @@ class ModsController extends BaseV1Controller
 				->writeJsonBody(['error' => 'Mod version not found']);
 		}
 
-		$this->modDataStorage->delete($modVersion->dataPath);
+		if ($this->modVersionRepository->countVersionsUsing([$modVersion]) > 0) {
+			return $this->usedByVersions($response, 'This mod version');
+		}
+
+		$dataPath = $modVersion->dataPath;
 		$this->modVersionRepository->delete($modVersion);
+		$this->modDataStorage->delete($dataPath);
 
 		return $response->withStatus(IResponse::S204_NoContent);
 	}
@@ -294,6 +338,13 @@ class ModsController extends BaseV1Controller
 		/** @var User|null $user */
 		$user = $request->getAttribute('user');
 		return $user;
+	}
+
+	/** Custom versions others may use are built from it, and they would silently change if it went away. */
+	private function usedByVersions(ApiResponse $response, string $subject): ApiResponse
+	{
+		return $response->withStatus(IResponse::S409_Conflict)
+			->writeJsonBody(['error' => $subject . ' is used by a custom game version, so it cannot be deleted.']);
 	}
 
 	private function unauthorized(ApiResponse $response): ApiResponse

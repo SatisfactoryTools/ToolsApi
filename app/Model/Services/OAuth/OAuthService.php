@@ -13,11 +13,15 @@ use greeny\SatisfactoryTools\Api\Model\Services\AuthException;
 use greeny\SatisfactoryTools\Api\Model\Services\AuthService;
 use greeny\SatisfactoryTools\Api\Model\Services\Supporters\SupporterService;
 use Nette\Utils\Random;
+use Throwable;
 
 class OAuthService
 {
 
 	private const int DESKTOP_RESULT_GRACE = 60;
+	private const int CONFIRM_CODE_LENGTH = 6;
+	private const string CONFIRM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+	private const int CONFIRM_ATTEMPTS = 5;
 
 	public function __construct(
 		private readonly OAuthProviderRegistry $registry,
@@ -43,7 +47,7 @@ class OAuthService
 		return $this->registry->has($providerKey);
 	}
 
-	/** @return array{authorizationUrl: string, state: string, pollToken?: string} */
+	/** @return array{authorizationUrl: string, state: string, pollToken?: string, confirmCode?: string} */
 	public function start(string $providerKey, ?User $linkUser = null, bool $desktop = false): array
 	{
 		$provider = $this->registry->get($providerKey);
@@ -54,6 +58,7 @@ class OAuthService
 		$state->provider = $providerKey;
 		$state->linkUser = $linkUser;
 		$state->pollToken = $desktop ? Random::generate(48, '0-9a-zA-Z') : null;
+		$state->confirmCode = $desktop ? $this->generateConfirmCode() : null;
 		$state->expiresAt = new DateTimeImmutable('+' . $this->stateTtl . ' seconds');
 		$state->createdAt = new DateTimeImmutable();
 		$this->stateRepository->save($state);
@@ -64,17 +69,25 @@ class OAuthService
 		];
 		if ($state->pollToken !== null) {
 			$result['pollToken'] = $state->pollToken;
+			$result['confirmCode'] = $state->confirmCode;
 		}
 
 		return $result;
 	}
 
-	/** @param array<string, mixed> $params */
-	public function handleCallback(string $providerKey, array $params): OAuthCallbackResult
+	/**
+	 * The state alone proves nothing about who finishes the flow: anyone can start one and send the provider
+	 * link to someone else. So a browser flow must come back to the browser that started it ($startedHere,
+	 * which the frontend knows from its own record of the state), a link flow must come back signed in as the
+	 * account being linked, and a desktop flow must be confirmed with the code shown in the app.
+	 * @param array<string, mixed> $params
+	 * @throws OAuthConfirmationRequired
+	 */
+	public function handleCallback(string $providerKey, array $params, ?User $requestUser = null, bool $startedHere = false, string $confirmCode = ''): OAuthCallbackResult
 	{
 		$provider = $this->registry->get($providerKey);
 
-		$stateValue = (string) ($params['state'] ?? '');
+		$stateValue = is_string($params['state'] ?? null) ? $params['state'] : '';
 		if ($stateValue === '') {
 			throw new OAuthException('Missing OAuth state');
 		}
@@ -97,15 +110,54 @@ class OAuthService
 			// State is single-use: consume it before doing anything else.
 			$this->stateRepository->delete($state);
 
+			if (!$startedHere) {
+				throw new OAuthException('This sign-in was started in another browser. Please start it again here.');
+			}
+			if ($linkUser !== null && $requestUser?->id !== $linkUser->id) {
+				throw new OAuthException('Please sign in to the account you are connecting ' . ucfirst($providerKey) . ' to, then try again.');
+			}
+
 			return $this->exchange($provider, $providerKey, $params, $linkUser);
 		}
+
+		$this->confirmDesktop($state, $confirmCode);
 
 		try {
 			return $this->exchange($provider, $providerKey, $params, $linkUser)->forDesktop($state);
 		} catch (AuthException $e) {
 			$this->completeDesktop($state, ['error' => $e->getMessage()]);
 			throw $e;
+		} catch (Throwable $e) {
+			// Without a result the app would keep polling until the state expires.
+			$this->completeDesktop($state, ['error' => 'Signing in did not work. Please try again.']);
+			throw $e;
 		}
+	}
+
+	/** @throws OAuthConfirmationRequired */
+	private function confirmDesktop(OAuthState $state, string $confirmCode): void
+	{
+		$confirmCode = strtoupper((string) preg_replace('~[\s-]+~', '', $confirmCode));
+		if ($confirmCode === '') {
+			throw new OAuthConfirmationRequired();
+		}
+		if ($state->confirmCode !== null && hash_equals($state->confirmCode, $confirmCode)) {
+			return;
+		}
+
+		$state->confirmAttempts++;
+		if ($state->confirmAttempts >= self::CONFIRM_ATTEMPTS) {
+			$this->completeDesktop($state, ['error' => 'The confirmation code was entered wrongly too many times. Please start signing in again.']);
+			throw new OAuthException('The code was entered wrongly too many times. Please start signing in again in the desktop app.');
+		}
+		$this->stateRepository->save($state);
+
+		throw new OAuthException('The code does not match the one shown in the desktop app.');
+	}
+
+	private function generateConfirmCode(): string
+	{
+		return Random::generate(self::CONFIRM_CODE_LENGTH, self::CONFIRM_CODE_ALPHABET);
 	}
 
 	/** @param array<string, mixed> $result */
@@ -247,8 +299,13 @@ class OAuthService
 			);
 		}
 
-		$user = $this->userRepository->getByEmail($info->email) ?? $this->createUserFromOAuth($info->email);
-		$this->createIdentity($user, $providerKey, $info);
+		$email = $info->email;
+		$user = $this->userRepository->withAccountLock(function () use ($providerKey, $info, $email): User {
+			$user = $this->userRepository->getByEmail(strtolower($email)) ?? $this->createUserFromOAuth($email);
+			$this->createIdentity($user, $providerKey, $info);
+
+			return $user;
+		});
 
 		return OAuthCallbackResult::authenticated(
 			$user,

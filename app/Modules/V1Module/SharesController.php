@@ -13,6 +13,9 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Repositories\FolderRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\ClientIp;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\RateLimiter;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\RateLimitExceeded;
 use greeny\SatisfactoryTools\Api\Model\Services\ShareInputException;
 use greeny\SatisfactoryTools\Api\Model\Services\ShareService;
 use Nette\Http\IResponse;
@@ -31,6 +34,7 @@ class SharesController extends BaseV1Controller
 		private readonly VersionRepository $versionRepository,
 		private readonly FolderRepository $folderRepository,
 		private readonly PlanRepository $planRepository,
+		private readonly RateLimiter $rateLimiter,
 	)
 	{
 	}
@@ -86,6 +90,14 @@ class SharesController extends BaseV1Controller
 		}
 
 		if ($hasRoot) {
+			try {
+				$this->rateLimiter->hit('anonymousShare', ClientIp::of($request));
+			} catch (RateLimitExceeded $e) {
+				return $response->withStatus(IResponse::S429_TooManyRequests)
+					->withHeader('Retry-After', (string) $e->retryAfter)
+					->writeJsonBody(['error' => $e->getMessage()]);
+			}
+
 			try {
 				$share = $this->shareService->shareTree($user, $version, $type, $body['root']);
 			} catch (ShareInputException $e) {

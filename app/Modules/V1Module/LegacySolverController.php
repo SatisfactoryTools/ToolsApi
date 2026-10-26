@@ -11,6 +11,7 @@ use greeny\SatisfactoryTools\Api\Model\Legacy\LegacySolverException;
 use greeny\SatisfactoryTools\Api\Model\Legacy\LegacySolverService;
 use JsonException;
 use Nette\Http\IResponse;
+use Psr\Log\LoggerInterface;
 
 #[Path('/legacy-solver')]
 class LegacySolverController extends BaseV1Controller
@@ -19,6 +20,7 @@ class LegacySolverController extends BaseV1Controller
 	public function __construct(
 		private readonly LegacySolverService $legacySolverService,
 		private readonly LegacyGameDataLoader $gameDataLoader,
+		private readonly LoggerInterface $logger,
 	)
 	{
 	}
@@ -48,8 +50,12 @@ class LegacySolverController extends BaseV1Controller
 		try {
 			$result = $this->legacySolverService->solve($gameVersion, $productionRequest);
 		} catch (LegacySolverException $e) {
+			if (!$e->isTimeout()) {
+				$this->logger->warning('Legacy solver failed: ' . $e->getMessage(), ['exception' => $e]);
+			}
+
 			return $response->withStatus($e->isTimeout() ? IResponse::S504_GatewayTimeout : IResponse::S500_InternalServerError)
-				->writeJsonBody(['error' => $e->isTimeout() ? 'The calculation took too long' : 'The calculation failed', 'detail' => $e->getMessage()]);
+				->writeJsonBody(['error' => $e->isTimeout() ? 'The calculation took too long' : 'The calculation failed']);
 		}
 
 		// (object) so an empty result is {} and not [], which is what the client expects.

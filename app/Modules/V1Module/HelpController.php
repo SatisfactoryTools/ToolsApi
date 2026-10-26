@@ -297,7 +297,8 @@ class HelpController extends BaseV1Controller
 
 		$image = new HelpImage();
 		$image->uuid = Uuid::uuid4();
-		$image->fileName = trim((string) ($body['fileName'] ?? '')) ?: ('image.' . $extension);
+		$fileName = is_string($body['fileName'] ?? null) ? mb_substr(trim($body['fileName']), 0, 255) : '';
+		$image->fileName = $fileName !== '' ? $fileName : 'image.' . $extension;
 		$image->uploadedAt = new DateTimeImmutable();
 		$image->user = $user;
 		$image->path = $this->imageStorage->store($image->uuid, $bytes, $extension);

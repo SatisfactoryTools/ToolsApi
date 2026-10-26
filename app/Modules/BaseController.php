@@ -16,6 +16,25 @@ abstract class BaseController implements IController
 		return Uuid::fromString((string) $request->getParameter($name));
 	}
 
+	/** Null for anything that is not a valid UUID string, so callers can answer 400 instead of failing with 500. */
+	protected function toUuid(mixed $value): ?UuidInterface
+	{
+		return is_string($value) && Uuid::isValid($value) ? Uuid::fromString($value) : null;
+	}
+
+	/** The error message for a name field, or null when it is fine (a string of at most $maxLength characters). */
+	protected function nameError(mixed $value, string $field, int $maxLength = 255): ?string
+	{
+		if (!is_string($value)) {
+			return 'Field ' . $field . ' must be a string';
+		}
+		if (mb_strlen(trim($value)) > $maxLength) {
+			return 'Field ' . $field . ' may be at most ' . $maxLength . ' characters long';
+		}
+
+		return null;
+	}
+
 	/** @return array<string, mixed> */
 	protected function parseBody(ApiRequest $request): array
 	{

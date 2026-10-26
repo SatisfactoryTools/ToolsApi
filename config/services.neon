@@ -47,7 +47,10 @@ services:
 
 	- greeny\SatisfactoryTools\Api\Model\Services\ShareService
 
-	- greeny\SatisfactoryTools\Api\Model\Services\LegacyShareFetcher(sourceUrl: %legacyShareSourceUrl%)
+	- greeny\SatisfactoryTools\Api\Model\Services\LegacyShareFetcher(
+		sourceUrl: %legacyShareSourceUrl%,
+		missCacheDir: %tempDir%/cache/legacy-share-misses
+	)
 
 	- greeny\SatisfactoryTools\Api\Model\Legacy\LegacyGameDataLoader(dataDir: %appDir%/../data/legacy)
 
@@ -136,23 +139,31 @@ services:
 			clientId: %oauth.discord.clientId%,
 			clientSecret: %oauth.discord.clientSecret%
 		)
+		setup:
+			- setLogger
 
 	oauthGithubProvider:
 		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\GithubProvider(
 			clientId: %oauth.github.clientId%,
 			clientSecret: %oauth.github.clientSecret%
 		)
+		setup:
+			- setLogger
 
 	oauthGoogleProvider:
 		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\GoogleProvider(
 			clientId: %oauth.google.clientId%,
 			clientSecret: %oauth.google.clientSecret%
 		)
+		setup:
+			- setLogger
 
 	oauthSteamProvider:
 		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\SteamProvider(
 			apiKey: %oauth.steam.apiKey%
 		)
+		setup:
+			- setLogger
 
 	oauthProviderRegistry:
 		factory: greeny\SatisfactoryTools\Api\Model\Services\OAuth\OAuthProviderRegistry([
@@ -169,6 +180,10 @@ services:
 			stateTtl: %oauth.stateTtl%
 		)
 
+	- greeny\SatisfactoryTools\Api\Model\Services\RateLimit\RateLimiter(limits: %rateLimits%)
+
+	- greeny\SatisfactoryTools\Api\Model\Services\UserQuotas(%quotas%)
+
 	corsMiddleware:
 		factory: greeny\SatisfactoryTools\Api\Utils\CorsMiddleware
 		tags:
@@ -180,3 +195,18 @@ services:
 		tags:
 			middleware:
 				priority: 20
+
+	bodySizeMiddleware:
+		factory: greeny\SatisfactoryTools\Api\Utils\BodySizeMiddleware(
+			maxBytes: %requestBody.maxBytes%,
+			overrides: %requestBody.overrides%
+		)
+		tags:
+			middleware:
+				priority: 12
+
+	rateLimitMiddleware:
+		factory: greeny\SatisfactoryTools\Api\Utils\RateLimitMiddleware(routes: %rateLimitRoutes%)
+		tags:
+			middleware:
+				priority: 14

@@ -14,6 +14,9 @@ use Doctrine\DBAL\Exception\TableNotFoundException;
 use greeny\SatisfactoryTools\Api\Model\Entities\LegacyShare;
 use greeny\SatisfactoryTools\Api\Model\Repositories\LegacyShareRepository;
 use greeny\SatisfactoryTools\Api\Model\Services\LegacyShareFetcher;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\ClientIp;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\RateLimiter;
+use greeny\SatisfactoryTools\Api\Model\Services\RateLimit\RateLimitExceeded;
 use greeny\SatisfactoryTools\Api\Model\Services\LegacyShareFetchException;
 use Nette\Http\IResponse;
 use Psr\Log\LoggerInterface;
@@ -31,6 +34,7 @@ class LegacySharesController extends BaseV1Controller
 		private readonly LegacyShareRepository $legacyShareRepository,
 		private readonly LegacyShareFetcher $legacyShareFetcher,
 		private readonly LoggerInterface $logger,
+		private readonly RateLimiter $rateLimiter,
 	)
 	{
 	}
@@ -62,15 +66,22 @@ class LegacySharesController extends BaseV1Controller
 			return $this->document($response, $share->data);
 		}
 
-		if (!$this->legacyShareFetcher->isEnabled()) {
+		if (!$this->legacyShareFetcher->isEnabled() || $this->legacyShareFetcher->isKnownMiss($slug)) {
 			return $this->notFound($response);
 		}
 
 		try {
+			$this->rateLimiter->hit('legacyShareFetch', ClientIp::of($request));
 			$data = $this->legacyShareFetcher->fetch($slug);
+		} catch (RateLimitExceeded $e) {
+			return $response->withStatus(IResponse::S429_TooManyRequests)
+				->withHeader('Retry-After', (string) $e->retryAfter)
+				->writeJsonBody(['error' => $e->getMessage()]);
 		} catch (LegacyShareFetchException $e) {
+			$this->logger->warning('Could not fetch legacy share ' . $slug . ': ' . $e->getMessage(), ['exception' => $e]);
+
 			return $response->withStatus(IResponse::S502_BadGateway)
-				->writeJsonBody(['error' => 'Could not load the share from the old Satisfactory Tools', 'detail' => $e->getMessage()]);
+				->writeJsonBody(['error' => 'Could not load the share from the old Satisfactory Tools']);
 		}
 
 		if ($data === null) {

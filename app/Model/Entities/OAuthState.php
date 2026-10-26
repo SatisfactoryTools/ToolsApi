@@ -26,6 +26,12 @@ class OAuthState
 	#[ORM\Column(length: 64, nullable: true)]
 	public ?string $pollToken = null;
 
+	#[ORM\Column(length: 16, nullable: true)]
+	public ?string $confirmCode = null;
+
+	#[ORM\Column(options: ['default' => 0])]
+	public int $confirmAttempts = 0;
+
 	/** @var array<string, mixed>|null */
 	#[ORM\Column(type: 'json', nullable: true)]
 	public ?array $result = null;
