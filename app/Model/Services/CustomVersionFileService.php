@@ -10,7 +10,7 @@ class CustomVersionFileService
 {
 
 	/** Bump when the generator output or merge/multiplier logic changes, to invalidate previously generated files. */
-	private const int GENERATOR_VERSION = 2;
+	private const int GENERATOR_VERSION = 3;
 
 	private const string CUSTOM_DIR = 'data/versions/custom';
 

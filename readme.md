@@ -144,6 +144,7 @@ Endpoints (v1)
   anyone holding its planner URL; 404 unless the owner left `linkAccess` on
 - `GET|POST|PUT|DELETE /v1/mods` and `.../{uuid}/versions...`
 - `GET|PUT /v1/settings` - per-user settings blob
+- `GET|PUT /v1/games` - per-user blob of the games loaded from save files (taken nodes, collected items, players per version)
 - `GET /v1/help`, `GET /v1/help/article/{slug}` - the help manifest and a single help
   article; readers normally load the static snapshot under `data/help/` instead and only
   fall back to these

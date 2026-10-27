@@ -17,6 +17,8 @@ class CustomVersionDataGenerator
 
 	public function __construct(
 		private readonly string $wwwDir,
+		private readonly WorldDataService $worldDataService,
+		private readonly WorldFileStorage $worldFiles,
 	)
 	{
 	}
@@ -53,9 +55,31 @@ class CustomVersionDataGenerator
 				$data['metadata'] = [];
 			}
 			$data['metadata']['world'] = $worldData;
+			if (isset($worldData['seed']) || isset($worldData['mode']) || isset($worldData['purity'])) {
+				$data['metadata']['worldNodes'] = $this->worldNodes($worldData, $data['metadata']['worldSource'] ?? null);
+			}
 		}
 
 		$this->writeJson($targetRelativePath, $data);
+	}
+
+	/**
+	 * Positioned nodes for the version's own world settings, generated from the base build's world. Null when
+	 * the generator fails: the base's nodes would sit in the wrong places, so the version shows none instead.
+	 * @param array<string, mixed> $worldData
+	 */
+	private function worldNodes(array $worldData, mixed $worldSource): ?string
+	{
+		try {
+			return $this->worldFiles->storeNodes($this->worldDataService->generateNodes(
+				(int) ($worldData['seed'] ?? 0),
+				(string) ($worldData['mode'] ?? WorldDataService::DEFAULT_MODE),
+				(string) ($worldData['purity'] ?? WorldDataService::DEFAULT_PURITY),
+				worldFile: $this->worldFiles->sourceFile($worldSource),
+			));
+		} catch (WorldDataException) {
+			return null;
+		}
 	}
 
 	/**

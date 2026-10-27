@@ -1,0 +1,6 @@
+# Map tile sets and world files are content-addressed (the id or hash in the path is
+# derived from the contents), so a URL always serves the same bytes and may be cached
+# indefinitely. A changed map or world gets a new path through the version data file.
+<IfModule mod_headers.c>
+	Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>

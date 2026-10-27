@@ -6,9 +6,10 @@ use DateTimeImmutable;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
 use greeny\SatisfactoryTools\Api\Model\Services\OfficialVersionRegistry;
 use greeny\SatisfactoryTools\Api\Model\Services\PublishOutcome;
+use greeny\SatisfactoryTools\Api\Model\Services\VersionDataFile;
 use greeny\SatisfactoryTools\Api\Model\Services\WorldDataException;
 use greeny\SatisfactoryTools\Api\Model\Services\WorldDataService;
-use JsonException;
+use greeny\SatisfactoryTools\Api\Model\Services\WorldFileStorage;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -27,14 +28,14 @@ class PublishCommand extends Command
 		['suffix' => '-ficsmas', 'ficsmas' => true],
 	];
 
-	/** Matches the extractor's formatting. */
 	private const int JSON_FLAGS = JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
 
 	public function __construct(
 		private readonly VersionRepository $versionRepository,
 		private readonly OfficialVersionRegistry $registry,
 		private readonly WorldDataService $worldDataService,
-		private readonly string $wwwDir,
+		private readonly WorldFileStorage $worldFiles,
+		private readonly VersionDataFile $dataFiles,
 	)
 	{
 		parent::__construct();
@@ -89,23 +90,29 @@ class PublishCommand extends Command
 		$variants = [];
 		foreach (self::VARIANTS as $variant) {
 			$dataPath = sprintf('data/versions/%s-%s%s.json', $branch, $buildId, $variant['suffix']);
-			$absolute = $this->absolutePath($dataPath);
-			if (!is_file($absolute)) {
+			if (!is_file($this->dataFiles->absolutePath($dataPath))) {
 				$io->error(sprintf('Data file not found: %s', $dataPath));
 				return Command::FAILURE;
 			}
-			$variants[] = $variant + ['dataPath' => $dataPath, 'absolute' => $absolute];
+			$variants[] = $variant + ['dataPath' => $dataPath];
 		}
 
-		// Resource nodes are identical in both variants, so the world is generated once.
+		// Resource nodes are identical in both variants, so the world is generated once - from the world
+		// the assets extractor pulled out of this build when it did, else from the configured default world.
 		$worldData = null;
+		$worldNodes = null;
 		if (!$input->getOption('skip-world-data')) {
-			$io->writeln('Generating world data (seed 0, mode none, purity no-change)...');
 			try {
-				$worldData = $this->worldDataService->generate(0);
+				$worldSource = $this->worldFiles->sourceFile($this->dataFiles->read($variants[0]['dataPath'])['metadata']['worldSource'] ?? null);
+				$io->writeln(sprintf('Generating world data (seed 0, mode none, purity no-change) from %s...', $worldSource !== null ? basename($worldSource) : 'the default world'));
+				$worldData = $this->worldDataService->generate(0, worldFile: $worldSource);
+				$worldNodes = $this->worldFiles->storeNodes($this->worldDataService->generateNodes(0, worldFile: $worldSource));
 			} catch (WorldDataException $e) {
 				$io->error('World data generation failed: ' . $e->getMessage());
 				$io->note('Fix the world-data generator configuration, or re-run with --skip-world-data.');
+				return Command::FAILURE;
+			} catch (\RuntimeException $e) {
+				$io->error($e->getMessage());
 				return Command::FAILURE;
 			}
 		}
@@ -115,7 +122,7 @@ class PublishCommand extends Command
 		try {
 			$outcomes = [];
 			foreach ($variants as $variant) {
-				$this->stampMetadata($variant['absolute'], $buildId, $gameVersion, $branch, $variant['ficsmas'], $importedAt, $worldData);
+				$this->stampMetadata($variant['dataPath'], $buildId, $gameVersion, $branch, $variant['ficsmas'], $importedAt, $worldData, $worldNodes);
 				$outcomes[] = $this->registry->register(
 					$variant['dataPath'],
 					$buildId,
@@ -197,51 +204,47 @@ class PublishCommand extends Command
 		}
 	}
 
-	/** @param array<string, mixed>|null $worldData */
+	/**
+	 * Replaces the extractor's metadata with the build's, keeping the world references the extractor left in it.
+	 * @param array<string, mixed>|null $worldData
+	 */
 	private function stampMetadata(
-		string $absolute,
+		string $dataPath,
 		string $buildId,
 		?string $gameVersion,
 		string $branch,
 		bool $ficsmas,
 		string $importedAt,
 		?array $worldData,
+		?string $worldNodes,
 	): void
 	{
-		$contents = @file_get_contents($absolute); // @ intentional
-		if ($contents === false) {
-			throw new \RuntimeException(sprintf('Could not read data file: %s', $absolute));
-		}
+		$data = $this->dataFiles->read($dataPath);
+		$previous = is_array($data['metadata'] ?? null) ? $data['metadata'] : [];
 
-		try {
-			$data = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
-			$metadata = [
-				'buildId' => $buildId,
-				'version' => $gameVersion,
-				'branch' => $branch,
-				'ficsmas' => $ficsmas,
-				'importedAt' => $importedAt,
-			];
-			$world = $worldData ?? ($data['metadata']['world'] ?? null);
-			if ($world !== null) {
-				$metadata['world'] = $world;
+		$metadata = [
+			'buildId' => $buildId,
+			'version' => $gameVersion,
+			'branch' => $branch,
+			'ficsmas' => $ficsmas,
+			'importedAt' => $importedAt,
+		];
+		$world = $worldData ?? ($previous['world'] ?? null);
+		if ($world !== null) {
+			$metadata['world'] = $world;
+		}
+		$references = $previous;
+		if ($worldNodes !== null) {
+			$references['worldNodes'] = $worldNodes;
+		}
+		foreach (VersionDataFile::WORLD_REFERENCE_KEYS as $key) {
+			if (($references[$key] ?? null) !== null) {
+				$metadata[$key] = $references[$key];
 			}
-			$data['metadata'] = $metadata;
-			$json = json_encode($data, self::JSON_FLAGS);
-		} catch (JsonException $e) {
-			throw new \RuntimeException(sprintf('Data file is not valid JSON: %s', $absolute), 0, $e);
 		}
+		$data['metadata'] = $metadata;
 
-		$tmp = $absolute . '.tmp';
-		if (@file_put_contents($tmp, $json) === false || !@rename($tmp, $absolute)) { // @ intentional
-			@unlink($tmp); // @ intentional
-			throw new \RuntimeException(sprintf('Could not write data file: %s', $absolute));
-		}
-	}
-
-	private function absolutePath(string $relativePath): string
-	{
-		return rtrim($this->wwwDir, '/') . '/' . ltrim($relativePath, '/');
+		$this->dataFiles->write($dataPath, $data);
 	}
 
 }

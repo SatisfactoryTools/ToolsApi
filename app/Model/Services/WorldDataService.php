@@ -29,10 +29,22 @@ class WorldDataService
 	}
 
 	/**
+	 * Per-resource node counts by purity for one seed + settings.
 	 * @param (callable(): void)|null $beforeRun called only when the binary actually has to run, so a caller can rate-limit just that
+	 * @param string|null $worldFile generator input (an extracted world source); null = the configured default world
 	 * @return array<string, mixed>
 	 */
-	public function generate(int $seed, string $mode = self::DEFAULT_MODE, string $purity = self::DEFAULT_PURITY, ?callable $beforeRun = null): array
+	public function generate(int $seed, string $mode = self::DEFAULT_MODE, string $purity = self::DEFAULT_PURITY, ?callable $beforeRun = null, ?string $worldFile = null): array
+	{
+		return $this->aggregate($this->generateNodes($seed, $mode, $purity, $beforeRun, $worldFile), $seed, $mode, $purity);
+	}
+
+	/**
+	 * The generator's raw output: every node with its name, resource, purity and location.
+	 * @param (callable(): void)|null $beforeRun called only when the binary actually has to run
+	 * @return array<string, mixed>
+	 */
+	public function generateNodes(int $seed, string $mode = self::DEFAULT_MODE, string $purity = self::DEFAULT_PURITY, ?callable $beforeRun = null, ?string $worldFile = null): array
 	{
 		if (!in_array($mode, self::MODES, true)) {
 			throw new WorldDataException('Unknown mode: ' . $mode);
@@ -40,13 +52,15 @@ class WorldDataService
 		if (!in_array($purity, self::PURITY_SETTINGS, true)) {
 			throw new WorldDataException('Unknown purity setting: ' . $purity);
 		}
-		if ($this->generatorBin === '' || $this->worldFile === '') {
+		$worldFile ??= $this->worldFile;
+		if ($this->generatorBin === '' || $worldFile === '') {
 			throw new WorldDataException('World data generator is not configured');
 		}
 		if (!is_file($this->generatorBin) || !is_executable($this->generatorBin)) {
 			throw new WorldDataException('World data generator binary is missing or not executable');
 		}
-		if (!is_file($this->worldFile)) {
+		$worldHash = @hash_file('sha256', $worldFile); // @ intentional
+		if ($worldHash === false) {
 			throw new WorldDataException('World data file not found');
 		}
 
@@ -56,10 +70,10 @@ class WorldDataService
 				$beforeRun();
 			}
 
-			return $this->generateUncached($seed, $mode, $purity);
+			return $this->generateUncached($seed, $mode, $purity, $worldFile);
 		}
 
-		$cacheFile = sprintf('%s/%s_%s_%d.json', rtrim($this->cacheDir, '/'), $mode, $purity, $seed);
+		$cacheFile = sprintf('%s/nodes_%s_%s_%d_%s.json', rtrim($this->cacheDir, '/'), $mode, $purity, $seed, substr($worldHash, 0, 12));
 
 		$cached = $this->readCache($cacheFile);
 		if ($cached !== null) {
@@ -70,14 +84,14 @@ class WorldDataService
 			$beforeRun();
 		}
 
-		$result = $this->withLock($cacheFile . '.lock', function () use ($seed, $mode, $purity, $cacheFile): array {
+		$result = $this->withLock($cacheFile . '.lock', function () use ($seed, $mode, $purity, $worldFile, $cacheFile): array {
 			// Another request may have produced the result while we waited for the lock.
 			$cached = $this->readCache($cacheFile);
 			if ($cached !== null) {
 				return $cached;
 			}
 
-			$result = $this->generateUncached($seed, $mode, $purity);
+			$result = $this->generateUncached($seed, $mode, $purity, $worldFile);
 			$this->writeCache($cacheFile, $result);
 
 			return $result;
@@ -102,17 +116,15 @@ class WorldDataService
 	}
 
 	/** @return array<string, mixed> */
-	private function generateUncached(int $seed, string $mode, string $purity): array
+	private function generateUncached(int $seed, string $mode, string $purity, string $worldFile): array
 	{
-		$raw = $this->run([
+		return $this->run([
 			$this->generatorBin,
 			'--seed=' . $seed,
 			'--mode=' . $mode,
 			'--purity=' . $purity,
-			'--world-file=' . $this->worldFile,
+			'--world-file=' . $worldFile,
 		]);
-
-		return $this->aggregate($raw, $seed, $mode, $purity);
 	}
 
 	/** @return array<string, mixed>|null */

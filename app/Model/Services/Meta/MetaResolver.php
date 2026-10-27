@@ -129,6 +129,14 @@ class MetaResolver
 		if ($page === 'codex') {
 			return $this->codex($version, array_slice($segments, 2));
 		}
+		if ($page === 'map') {
+			return count($segments) === 2 ? new PageMeta(
+				MetaText::title(sprintf('Map (%s)', $version->name)),
+				sprintf('Map of the Satisfactory world (%s).', $version->name),
+				null,
+				'page',
+			) : null;
+		}
 		if ($page !== 'planner' || count($segments) > 4) {
 			return null;
 		}
