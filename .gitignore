@@ -20,6 +20,7 @@ www/data/*
 !www/data/.htaccess
 !www/data/versions/
 www/data/versions/*
+!www/data/versions/.htaccess
 !www/data/versions/custom/
 www/data/versions/custom/*
 !www/data/versions/custom/.htaccess

@@ -1,0 +1,7 @@
+# Official version data files keep their URL but are rewritten in place (publish stamps the
+# build metadata, world:attach adds the map), so browsers must check back instead of guessing
+# a lifetime from Last-Modified. The answer is a cheap 304 while the ETag still matches.
+# Custom versions (custom/) are content-addressed and override this with their own file.
+<IfModule mod_headers.c>
+	Header set Cache-Control "no-cache"
+</IfModule>
