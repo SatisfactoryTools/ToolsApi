@@ -4,4 +4,7 @@
 # Custom versions (custom/) are content-addressed and override this with their own file.
 <IfModule mod_headers.c>
 	Header set Cache-Control "no-cache"
+	# mod_deflate tags the ETag of a compressed reply with "-gzip" but then compares the browser's
+	# copy against the plain one, so the check never matches and the whole file is sent again.
+	RequestHeader edit "If-None-Match" "^\"(.*)-gzip\"$" "\"$1\", \"$1-gzip\""
 </IfModule>
