@@ -12,7 +12,11 @@ final class MetaText
 
 	public const string SUPPORTER_NOTE = '♥ Shared by a Satisfactory Tools supporter.';
 
-	public const string DEFAULT_DESCRIPTION = 'Production planner for Satisfactory. Tell it what you want to make and it works out the machines, recipes and resources you need. Also a searchable codex, custom versions and mods. Free to use.';
+	public const string HOME_TITLE = self::SITE_NAME . ' - Production calculator & planner';
+	public const string HOME_HEADING = 'Production calculator and planner for Satisfactory';
+	public const string PLANNER_TITLE = 'Production calculator & planner (%s)';
+
+	public const string DEFAULT_DESCRIPTION = 'Free production calculator and planner for Satisfactory. Tell it what you want to make and it works out the machines, recipes and resources you need. Also a codex, map, custom versions and mods.';
 
 	/** Tag-like markup only (`<b>`, `</color>`, `<img src=…/>`), so a bare "<" in text survives. */
 	private const string TAG_PATTERN = '~</?[A-Za-z][^<>]*>~u';

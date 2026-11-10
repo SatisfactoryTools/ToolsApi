@@ -3,11 +3,9 @@
 namespace greeny\SatisfactoryTools\Api\Model\Services\Meta;
 
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
-use greeny\SatisfactoryTools\Api\Model\Repositories\HelpArticleRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
 use greeny\SatisfactoryTools\Api\Model\Services\PlanLinkService;
 use greeny\SatisfactoryTools\Api\Model\Services\ShareService;
-use JsonException;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -23,19 +21,25 @@ class MetaResolver
 		'0.8', '1.0', '1.0-ficsmas', 'production', 'codex', 'import',
 	];
 
+	/** Old-site URL shapes, mirrored from RouteList.ts and LegacyUrlRedirectComponent. */
+	private const array LEGACY_VERSIONS = ['0.8', '1.0', '1.0-ficsmas'];
+	private const array LEGACY_FIRST_SEGMENTS = [...self::LEGACY_VERSIONS, 'production', 'codex', 'items'];
+	private const array LEGACY_CODEX_SECTIONS = ['items', 'buildings', 'schematics'];
+
+	/** Key => [title, description, indexable]. */
 	private const array FIXED_PAGES = [
-		'about' => ['About', 'Who makes Satisfactory Tools, what it can do, and where to report a bug or ask for a feature.'],
-		'create-version' => ['Create custom version', 'Make your own game version: add mods, change recipe and power costs, and set up a different world.'],
-		'mods' => ['Mods', 'Upload and manage mod data, then use the mods in your custom game versions.'],
-		'mod-editor' => ['Mod editor', 'Write the items, recipes and buildings of a mod and get the data file to upload.'],
-		'help' => ['Help', 'Guides and reference for Satisfactory Tools.'],
-		'settings' => ['Settings', null],
-		'account' => ['Account', null],
-		'auth' => ['Sign in', null],
-		'auth/login' => ['Sign in', null],
-		'auth/register' => ['Register', null],
-		'auth/forgot-password' => ['Forgot password', null],
-		'auth/reset-password' => ['Reset password', null],
+		'about' => ['About', 'Who makes Satisfactory Tools, what it can do, and where to report a bug or ask for a feature.', true],
+		'create-version' => ['Create custom version', 'Make your own game version: add mods, change recipe and power costs, and set up a different world.', true],
+		'mods' => ['Mods', 'Upload and manage mod data, then use the mods in your custom game versions.', false],
+		'mod-editor' => ['Mod editor', 'Write the items, recipes and buildings of a mod and get the data file to upload.', true],
+		'help' => ['Help', 'Guides and reference for Satisfactory Tools.', true],
+		'settings' => ['Settings', null, false],
+		'account' => ['Account', null, false],
+		'auth' => ['Sign in', null, false],
+		'auth/login' => ['Sign in', null, false],
+		'auth/register' => ['Register', null, false],
+		'auth/forgot-password' => ['Forgot password', null, false],
+		'auth/reset-password' => ['Reset password', null, false],
 	];
 
 	private const array CODEX_SECTIONS = [
@@ -45,18 +49,16 @@ class MetaResolver
 		'schematics' => ['Schematics', 'schematics', 'Schematic'],
 	];
 
-	private const string HELP_INDEX = 'data/help/index.json';
-
 	private const string UUID_PATTERN = '~^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$~D';
 
 	public function __construct(
 		private readonly VersionRepository $versionRepository,
 		private readonly ShareService $shareService,
 		private readonly PlanLinkService $planLinkService,
-		private readonly HelpArticleRepository $helpArticleRepository,
+		private readonly HelpMetaIndex $helpMetaIndex,
 		private readonly VersionMetaIndex $versionMetaIndex,
+		private readonly CanonicalVersion $canonicalVersion,
 		private readonly LoggerInterface $logger,
-		private readonly string $wwwDir,
 		private readonly string $publicApiUrl,
 	)
 	{
@@ -65,7 +67,8 @@ class MetaResolver
 	public function resolve(string $path): PageMeta
 	{
 		try {
-			return $this->resolvePath($path) ?? $this->defaults();
+			// Unknown paths still render the app (its not-found page), so they must not be indexed.
+			return $this->resolvePath($path) ?? $this->defaults()->notIndexed();
 		} catch (Throwable $e) {
 			$this->logger->error(sprintf('Could not resolve page metadata for "%s": %s', $path, $e->getMessage()), ['exception' => $e]);
 
@@ -73,9 +76,10 @@ class MetaResolver
 		}
 	}
 
+	/** No canonical and no noindex: used when the page is not known to be wrong, only not resolved. */
 	public function defaults(): PageMeta
 	{
-		return new PageMeta(MetaText::SITE_NAME, MetaText::DEFAULT_DESCRIPTION, null, 'default');
+		return new PageMeta(MetaText::HOME_TITLE, MetaText::DEFAULT_DESCRIPTION, null, 'default');
 	}
 
 	private function resolvePath(string $path): ?PageMeta
@@ -94,12 +98,17 @@ class MetaResolver
 		);
 
 		if ($segments === []) {
-			return null;
+			return $this->home();
+		}
+
+		if (in_array($segments[0], self::LEGACY_FIRST_SEGMENTS, true)) {
+			// Old share links are imported by the app in the browser, so they keep the client-side redirect.
+			return isset($query['share']) ? $this->defaults()->notIndexed() : $this->legacyRedirect($segments);
 		}
 
 		return match ($segments[0]) {
-			'shared' => isset($segments[1]) ? $this->share($segments[1]) : null,
-			'help' => isset($segments[1]) && $segments[1] !== 'editor' ? $this->helpArticle($segments[1]) : $this->fixedPage('help'),
+			'shared' => isset($segments[1]) ? $this->share($segments[1])?->notIndexed() : null,
+			'help' => $this->help(array_slice($segments, 1)),
 			'auth' => $this->fixedPage(isset(self::FIXED_PAGES['auth/' . ($segments[1] ?? '')]) ? 'auth/' . $segments[1] : 'auth'),
 			default => in_array($segments[0], self::RESERVED_SEGMENTS, true)
 				? $this->fixedPage($segments[0])
@@ -107,14 +116,40 @@ class MetaResolver
 		};
 	}
 
+	private function home(): PageMeta
+	{
+		return (new PageMeta(MetaText::HOME_TITLE, MetaText::DEFAULT_DESCRIPTION, null, 'default', MetaText::HOME_HEADING))
+			->indexedAs('/', $this->mainLinks());
+	}
+
 	private function fixedPage(string $key): ?PageMeta
 	{
 		if (!isset(self::FIXED_PAGES[$key])) {
 			return null;
 		}
-		[$title, $description] = self::FIXED_PAGES[$key];
+		[$title, $description, $indexable] = self::FIXED_PAGES[$key];
+		$meta = new PageMeta(MetaText::title($title), $description ?? MetaText::DEFAULT_DESCRIPTION, null, 'page', $title);
 
-		return new PageMeta(MetaText::title($title), $description ?? MetaText::DEFAULT_DESCRIPTION, null, 'page');
+		return $indexable ? $meta->indexedAs('/' . $key, $this->mainLinks()) : $meta->notIndexed();
+	}
+
+	/** @param string[] $segments the path below /help */
+	private function help(array $segments): ?PageMeta
+	{
+		if ($segments === []) {
+			$meta = $this->fixedPage('help');
+			$links = [];
+			foreach ($this->helpMetaIndex->all() as $slug => $article) {
+				$links[] = new PageLink('/help/' . rawurlencode($slug), $article['title']);
+			}
+
+			return $meta?->indexedAs('/help', [...$this->mainLinks(), ...$links]);
+		}
+		if ($segments[0] === 'editor') {
+			return $this->fixedPage('help')?->notIndexed();
+		}
+
+		return count($segments) === 1 ? $this->helpArticle($segments[0]) : null;
 	}
 
 	/** @param string[] $segments */
@@ -127,42 +162,170 @@ class MetaResolver
 
 		$page = $segments[1] ?? 'planner'; // the version root redirects to the planner
 		if ($page === 'codex') {
-			return $this->codex($version, array_slice($segments, 2));
+			$codexPath = array_slice($segments, 2);
+
+			return $this->indexedVersionPage($version, $this->codex($version, $codexPath), ['codex', ...$codexPath]);
 		}
 		if ($page === 'map') {
-			return count($segments) === 2 ? new PageMeta(
-				MetaText::title(sprintf('Map (%s)', $version->name)),
-				sprintf('Map of the Satisfactory world (%s).', $version->name),
-				null,
-				'page',
-			) : null;
+			$mapPath = array_slice($segments, 2);
+
+			return count($mapPath) <= 1 ? $this->indexedVersionPage($version, $this->map($version, $mapPath[0] ?? null), ['map', ...$mapPath]) : null;
 		}
 		if ($page !== 'planner' || count($segments) > 4) {
 			return null;
 		}
 		if (($segments[2] ?? null) === 'shared') {
-			return isset($segments[3]) ? $this->share($segments[3]) : null;
+			return isset($segments[3]) ? $this->share($segments[3])?->notIndexed() : null;
 		}
 		if ($codexQuery !== null && $codexQuery !== '') {
 			$codexPath = array_values(array_filter(explode('/', $codexQuery), static fn (string $segment): bool => $segment !== ''));
 
-			return $this->codex($version, $codexPath);
+			// The planner with a codex panel is the codex page again: it points to the standalone one.
+			return $this->indexedVersionPage($version, $this->codex($version, $codexPath), ['codex', ...$codexPath]);
 		}
 
-		if (isset($segments[2])) {
-			$plan = $this->planLink($segments[2]);
-			if ($plan !== null) {
-				return $plan;
-			}
-		}
-
-		// Plans the API does not know (device-only) or with link access off keep the generic title.
-		return new PageMeta(
-			MetaText::title(sprintf('Planner (%s)', $version->name)),
+		$planner = new PageMeta(
+			MetaText::title(sprintf(MetaText::PLANNER_TITLE, $version->name)),
 			MetaText::DEFAULT_DESCRIPTION,
 			null,
 			'page',
+			MetaText::HOME_HEADING,
 		);
+		if (isset($segments[2])) {
+			// Plans are personal; ones the API does not know (device-only) or with link access off keep the generic title.
+			return ($this->planLink($segments[2]) ?? $planner)->notIndexed();
+		}
+
+		return $this->indexedVersionPage($version, $planner, ['planner']);
+	}
+
+	/** @param string[] $segments the path below the version slug */
+	private function indexedVersionPage(Version $version, ?PageMeta $meta, array $segments): ?PageMeta
+	{
+		if ($meta === null) {
+			return null;
+		}
+		if ($version->custom) {
+			return $meta->notIndexed();
+		}
+
+		$canonical = $this->canonicalVersion->get() ?? $version;
+		if (!$this->canonicalVersion->isCanonical($version) && !$this->codexEntryExists($canonical, $segments)) {
+			return $meta->notIndexed(); // e.g. an item that only exists in an older version or in FICSMAS
+		}
+
+		return $meta->indexedAs(
+			CanonicalVersion::path($canonical, $segments),
+			[...$this->mainLinks(), ...$this->codexLinks($canonical, $segments), ...$this->mapLinks($canonical, $segments)],
+		);
+	}
+
+	private function map(Version $version, ?string $topic): ?PageMeta
+	{
+		if ($topic === null) {
+			return new PageMeta(
+				MetaText::title(sprintf('%s (%s)', MapTopicCatalog::MAP_HEADING, $version->name)),
+				sprintf(MapTopicCatalog::MAP_DESCRIPTION, $version->name),
+				null,
+				'page',
+				MapTopicCatalog::MAP_HEADING,
+			);
+		}
+
+		$entry = MapTopicCatalog::topics()[$topic] ?? null;
+		if ($entry === null) {
+			return null;
+		}
+		[$heading, $description] = $entry;
+
+		return new PageMeta(
+			MetaText::title(sprintf('%s (%s)', $heading, $version->name)),
+			sprintf($description, $version->name),
+			null,
+			'map-topic',
+			$heading,
+		);
+	}
+
+	/**
+	 * @param string[] $segments
+	 * @return list<PageLink>
+	 */
+	private function mapLinks(Version $version, array $segments): array
+	{
+		if (($segments[0] ?? null) !== 'map') {
+			return [];
+		}
+		$links = isset($segments[1]) ? [new PageLink(CanonicalVersion::path($version, ['map']), MapTopicCatalog::MAP_HEADING)] : [];
+		foreach (MapTopicCatalog::topics() as $slug => [$heading]) {
+			$links[] = new PageLink(CanonicalVersion::path($version, ['map', $slug]), $heading);
+		}
+
+		return $links;
+	}
+
+	/** @param string[] $segments */
+	private function codexEntryExists(Version $version, array $segments): bool
+	{
+		if (($segments[0] ?? null) !== 'codex' || !isset($segments[2])) {
+			return true;
+		}
+
+		return isset($this->versionMetaIndex->forVersion($version)[$segments[1]][$segments[2]]);
+	}
+
+	/**
+	 * Links a crawler that does not run scripts can follow from the page.
+	 * @return list<PageLink>
+	 */
+	private function mainLinks(): array
+	{
+		$links = [new PageLink('/', MetaText::SITE_NAME)];
+		$version = $this->canonicalVersion->get();
+		if ($version !== null) {
+			$links[] = new PageLink(CanonicalVersion::path($version, ['planner']), 'Production calculator');
+			$links[] = new PageLink(CanonicalVersion::path($version, ['codex']), 'Codex');
+			$links[] = new PageLink(CanonicalVersion::path($version, ['map']), 'Map');
+		}
+		$links[] = new PageLink('/help', 'Help');
+		$links[] = new PageLink('/about', 'About');
+
+		return $links;
+	}
+
+	/**
+	 * @param string[] $segments
+	 * @return list<PageLink>
+	 */
+	private function codexLinks(Version $version, array $segments): array
+	{
+		if (($segments[0] ?? null) !== 'codex' || count($segments) > 3) {
+			return [];
+		}
+		$section = $segments[1] ?? null;
+		if ($section === null) {
+			$links = [];
+			foreach (self::CODEX_SECTIONS as $key => [$title]) {
+				$links[] = new PageLink(CanonicalVersion::path($version, ['codex', $key]), $title);
+			}
+
+			return $links;
+		}
+		if (!isset(self::CODEX_SECTIONS[$section])) {
+			return [];
+		}
+		if (isset($segments[2])) {
+			return [new PageLink(CanonicalVersion::path($version, ['codex', $section]), self::CODEX_SECTIONS[$section][0])];
+		}
+
+		$entries = $this->versionMetaIndex->forVersion($version)[$section] ?? [];
+		uasort($entries, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+		$links = [];
+		foreach ($entries as $className => $entry) {
+			$links[] = new PageLink(CanonicalVersion::path($version, ['codex', $section, (string) $className]), $entry['name']);
+		}
+
+		return $links;
 	}
 
 	/** @param string[] $path */
@@ -174,6 +337,7 @@ class MetaResolver
 				sprintf('Searchable codex of items, recipes, buildings and schematics in Satisfactory (%s).', $version->name),
 				null,
 				'page',
+				'Codex',
 			);
 		}
 
@@ -187,6 +351,7 @@ class MetaResolver
 			sprintf('All %s in Satisfactory (%s).', $sectionNoun, $version->name),
 			null,
 			'codex-section',
+			$sectionTitle,
 		);
 		if (!isset($path[1])) {
 			return $sectionMeta;
@@ -208,6 +373,7 @@ class MetaResolver
 				MetaText::description(($entry['alternate'] ? 'Alternate recipe: ' : '') . $entry['summary']),
 				$this->imageUrl($entry['icon'] ?? null),
 				'codex-recipe',
+				$entry['name'],
 			);
 		}
 
@@ -220,7 +386,51 @@ class MetaResolver
 				'buildings' => 'codex-building',
 				default => 'codex-schematic',
 			},
+			$entry['name'],
 		);
+	}
+
+	/**
+	 * Server-side twin of the app's LegacyUrlRedirectComponent, so search engines see a permanent redirect.
+	 * @param string[] $segments
+	 */
+	private function legacyRedirect(array $segments): PageMeta
+	{
+		$oldVersion = in_array($segments[0], self::LEGACY_VERSIONS, true) ? $segments[0] : null;
+		$path = $oldVersion === null ? $segments : array_slice($segments, 1);
+		$version = $this->versionRepository->getLatestOfficial(false, $oldVersion === '1.0-ficsmas') ?? $this->canonicalVersion->get();
+		if ($version === null) {
+			return PageMeta::redirect('/');
+		}
+
+		return PageMeta::redirect(match ($path[0] ?? null) {
+			null => '/',
+			'codex' => $this->legacyCodexTarget($version, $path[1] ?? null, $path[2] ?? null),
+			'items' => $this->legacyCodexTarget($version, 'items', $path[1] ?? null),
+			default => CanonicalVersion::path($version, ['planner']),
+		});
+	}
+
+	private function legacyCodexTarget(Version $version, ?string $section, ?string $entrySlug): string
+	{
+		if ($section === null || !in_array($section, self::LEGACY_CODEX_SECTIONS, true)) {
+			return CanonicalVersion::path($version, ['codex']);
+		}
+		if ($entrySlug !== null) {
+			foreach ($this->versionMetaIndex->forVersion($version)[$section] ?? [] as $className => $entry) {
+				if (self::webalize($entry['name']) === $entrySlug) {
+					return CanonicalVersion::path($version, ['codex', $section, (string) $className]);
+				}
+			}
+		}
+
+		return CanonicalVersion::path($version, ['codex', $section]);
+	}
+
+	/** The old site's slug rule, as LegacyUrlRedirectComponent replicates it. */
+	private static function webalize(string $name): string
+	{
+		return mb_strtolower(str_replace(['™', ':'], '', (string) preg_replace('~[\s|.]+~u', '-', $name)));
 	}
 
 	private function share(string $uuid): ?PageMeta
@@ -335,44 +545,18 @@ class MetaResolver
 
 	private function helpArticle(string $slug): ?PageMeta
 	{
-		$article = $this->helpSummary($slug);
+		$article = $this->helpMetaIndex->get($slug);
 		if ($article === null) {
 			return null;
 		}
 
-		return new PageMeta(
+		return (new PageMeta(
 			MetaText::title($article['title'] . ' - Help'),
 			$article['summary'] !== '' ? MetaText::description($article['summary']) : self::FIXED_PAGES['help'][1],
 			null,
 			'help-article',
-		);
-	}
-
-	/** @return array{title: string, summary: string}|null */
-	private function helpSummary(string $slug): ?array
-	{
-		$file = rtrim($this->wwwDir, '/') . '/' . self::HELP_INDEX;
-		$contents = is_file($file) ? @file_get_contents($file) : false; // @ intentional
-		if ($contents !== false) {
-			try {
-				$manifest = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
-			} catch (JsonException) {
-				$manifest = null;
-			}
-			$entry = is_array($manifest) ? ($manifest['articles'][$slug] ?? null) : null;
-			if (!is_array($entry) || !is_string($entry['title'] ?? null)) {
-				return null;
-			}
-
-			return ['title' => $entry['title'], 'summary' => is_string($entry['summary'] ?? null) ? $entry['summary'] : ''];
-		}
-
-		$article = $this->helpArticleRepository->getBySlug($slug);
-		if ($article === null || !$article->published) {
-			return null;
-		}
-
-		return ['title' => $article->title, 'summary' => $article->summary];
+			$article['title'],
+		))->indexedAs('/help/' . rawurlencode($slug), $this->mainLinks());
 	}
 
 	private function imageUrl(?string $icon): ?string
