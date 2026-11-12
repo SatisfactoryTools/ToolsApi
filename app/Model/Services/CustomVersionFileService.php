@@ -10,7 +10,7 @@ class CustomVersionFileService
 {
 
 	/** Bump when the generator output or merge/multiplier logic changes, to invalidate previously generated files. */
-	private const int GENERATOR_VERSION = 3;
+	private const int GENERATOR_VERSION = 4;
 
 	private const string CUSTOM_DIR = 'data/versions/custom';
 
@@ -59,17 +59,16 @@ class CustomVersionFileService
 			throw new RuntimeException(sprintf('Custom version %s has no base version', $version->uuid->toString()));
 		}
 
-		$modDataPaths = [];
-		foreach ($version->getOrderedModVersions() as $modVersion) {
-			if ($modVersion->dataPath !== null) {
-				$modDataPaths[] = $modVersion->dataPath;
-			}
-		}
+		$modVersions = array_values(array_filter(
+			$version->getOrderedModVersions(),
+			static fn (ModVersion $modVersion): bool => $modVersion->dataPath !== null,
+		));
+		$modDataPaths = array_map(static fn (ModVersion $modVersion): string => (string) $modVersion->dataPath, $modVersions);
 
 		$target = $this->targetPath($version, $base, $modDataPaths);
 
 		if (!is_file($this->absolutePath($target))) {
-			$this->withLock('version-' . $version->uuid->toString(), function () use ($version, $base, $modDataPaths, $target): void {
+			$this->withLock('version-' . $version->uuid->toString(), function () use ($version, $base, $modVersions, $target): void {
 				// Another request may have generated the file while we waited for the lock.
 				if (is_file($this->absolutePath($target))) {
 					return;
@@ -78,7 +77,7 @@ class CustomVersionFileService
 				$this->dataGenerator->generate(
 					$base->dataPath,
 					$target,
-					$modDataPaths,
+					$modVersions,
 					$version->recipeCostMultiplier,
 					$version->powerCostMultiplier,
 					$version->worldData,

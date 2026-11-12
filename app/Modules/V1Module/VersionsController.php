@@ -14,6 +14,7 @@ use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use greeny\SatisfactoryTools\Api\Model\Entities\VersionModVersion;
 use greeny\SatisfactoryTools\Api\Model\Repositories\ModVersionRepository;
+use greeny\SatisfactoryTools\Api\Model\Services\ModDependencyOrder;
 use greeny\SatisfactoryTools\Api\Model\Repositories\PlanRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
 use greeny\SatisfactoryTools\Api\Model\Services\CustomVersionFileService;
@@ -46,6 +47,7 @@ class VersionsController extends BaseV1Controller
 	public function __construct(
 		private readonly VersionRepository $versionRepository,
 		private readonly ModVersionRepository $modVersionRepository,
+		private readonly ModDependencyOrder $modDependencyOrder,
 		private readonly PlanRepository $planRepository,
 		private readonly CustomVersionFileService $fileService,
 		private readonly WorldDataService $worldDataService,
@@ -272,6 +274,13 @@ class VersionsController extends BaseV1Controller
 			$seenMods[$modVersion->mod->id] = true;
 			$modVersions[] = $modVersion;
 		}
+
+		$ordered = $this->modDependencyOrder->order($modVersions);
+		if (is_string($ordered)) {
+			return $response->withStatus(IResponse::S400_BadRequest)
+				->writeJsonBody(['error' => $ordered]);
+		}
+		$modVersions = $ordered;
 
 		[$worldData, $worldDataError] = $this->parseWorldData($body);
 		if ($worldDataError !== null) {

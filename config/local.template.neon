@@ -30,6 +30,10 @@ parameters:
 	# Optional Steam Web API key (https://steamcommunity.com/dev/apikey), only used to read the persona name/avatar for display.
 	oauthSteamApiKey: ''
 
+	# Optional: id of the account that owns mods imported with `bin/console mods:import`
+	# (run by the assets extractor's `mod:import`).
+	# modImportOwnerUuid: ''
+
 	# Optional: supporter matching (readme "Supporters"). Leave a source empty to skip it.
 	# Patreon: the creator's access/refresh token from https://www.patreon.com/portal/registration/register-clients
 	# supporterPatreonAccessToken: ''

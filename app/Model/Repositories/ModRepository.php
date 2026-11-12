@@ -47,6 +47,11 @@ class ModRepository extends BaseRepository
 		return $this->getRepository()->findOneBy(['uuid' => $uuid]);
 	}
 
+	public function getByReferenceAndOwner(string $reference, User $user): ?Mod
+	{
+		return $this->getRepository()->findOneBy(['reference' => $reference, 'user' => $user]);
+	}
+
 	public function countByUser(User $user): int
 	{
 		return $this->getRepository()->count(['user' => $user]);

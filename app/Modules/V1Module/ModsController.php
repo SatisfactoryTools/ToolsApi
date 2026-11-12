@@ -170,6 +170,10 @@ class ModsController extends BaseV1Controller
 		if ($this->modVersionRepository->countVersionsUsing($modVersions) > 0) {
 			return $this->usedByVersions($response, 'This mod');
 		}
+		$dependents = $this->modVersionRepository->getDependents($modVersions);
+		if ($dependents !== []) {
+			return $this->neededByMods($response, 'This mod', $dependents);
+		}
 
 		// Files go only once the rows are gone, so a failed delete never leaves rows pointing at missing files.
 		$this->modRepository->delete($mod);
@@ -319,6 +323,10 @@ class ModsController extends BaseV1Controller
 		if ($this->modVersionRepository->countVersionsUsing([$modVersion]) > 0) {
 			return $this->usedByVersions($response, 'This mod version');
 		}
+		$dependents = $this->modVersionRepository->getDependents([$modVersion]);
+		if ($dependents !== []) {
+			return $this->neededByMods($response, 'This mod version', $dependents);
+		}
 
 		$dataPath = $modVersion->dataPath;
 		$this->modVersionRepository->delete($modVersion);
@@ -345,6 +353,18 @@ class ModsController extends BaseV1Controller
 	{
 		return $response->withStatus(IResponse::S409_Conflict)
 			->writeJsonBody(['error' => $subject . ' is used by a custom game version, so it cannot be deleted.']);
+	}
+
+	/** @param ModVersion[] $dependents */
+	private function neededByMods(ApiResponse $response, string $subject, array $dependents): ApiResponse
+	{
+		$names = array_unique(array_map(
+			static fn (ModVersion $dependent): string => $dependent->mod->name . ' ' . $dependent->name,
+			$dependents,
+		));
+
+		return $response->withStatus(IResponse::S409_Conflict)
+			->writeJsonBody(['error' => $subject . ' is needed by ' . implode(', ', $names) . ', so it cannot be deleted.']);
 	}
 
 	private function unauthorized(ApiResponse $response): ApiResponse

@@ -14,6 +14,7 @@ parameters:
 	supporterDiscordGuildId: ''
 	supporterDiscordRoleId: ''
 	errorReportDiscordChannelId: ''
+	modImportOwnerUuid: ''
 
 	# Public base URL of this API, for absolute image URLs in link previews (GET /v1/meta).
 	# Not derived from the request: the caller is the frontend's index.php, not a browser.
@@ -55,6 +56,10 @@ parameters:
 		createVersion: 'POST /v1/versions'
 		clientError: 'POST /v1/errors'
 		legacySolver: 'POST /v1/legacy-solver'
+
+	# Account that owns mods imported by the assets extractor's mod:import (tools-api mods:import).
+	modImport:
+		ownerUuid: %modImportOwnerUuid%
 
 	quotas:
 		plans: 2000                 # per user, all versions together

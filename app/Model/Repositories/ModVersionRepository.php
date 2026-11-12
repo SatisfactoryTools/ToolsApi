@@ -12,6 +12,11 @@ use Ramsey\Uuid\UuidInterface;
 class ModVersionRepository extends BaseRepository
 {
 
+	public function getByUuid(string $uuid): ?ModVersion
+	{
+		return $this->getRepository()->findOneBy(['uuid' => $uuid]);
+	}
+
 	public function getByUuidAndMod(UuidInterface $uuid, Mod $mod): ?ModVersion
 	{
 		return $this->getRepository()->findOneBy(['uuid' => $uuid, 'mod' => $mod]);
@@ -38,6 +43,31 @@ class ModVersionRepository extends BaseRepository
 			->setParameter('user', $user)
 			->getQuery()
 			->getOneOrNullResult();
+	}
+
+	public function getByModAndName(Mod $mod, string $name): ?ModVersion
+	{
+		return $this->getRepository()->findOneBy(['mod' => $mod, 'name' => $name]);
+	}
+
+	/**
+	 * Versions of other mods that need one of these, so these cannot go away.
+	 * @param ModVersion[] $modVersions
+	 * @return ModVersion[]
+	 */
+	public function getDependents(array $modVersions): array
+	{
+		if ($modVersions === []) {
+			return [];
+		}
+
+		return $this->getRepository()->createQueryBuilder('mv')
+			->join('mv.dependencies', 'dependency')
+			->where('dependency IN (:modVersions)')
+			->andWhere('mv NOT IN (:modVersions)')
+			->setParameter('modVersions', $modVersions)
+			->getQuery()
+			->getResult();
 	}
 
 	public function countByMod(Mod $mod): int

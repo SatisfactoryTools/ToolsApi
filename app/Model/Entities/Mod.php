@@ -24,6 +24,10 @@ class Mod
 	#[ORM\Column]
 	public bool $public = false;
 
+	/** ficsit.app mod reference of an imported mod, e.g. Easy_Recipes. */
+	#[ORM\Column(length: 255, nullable: true)]
+	public ?string $reference = null;
+
 	#[ORM\ManyToOne(targetEntity: User::class)]
 	#[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
 	public User $user;

@@ -2,6 +2,7 @@
 
 namespace greeny\SatisfactoryTools\Api\Model\Services;
 
+use greeny\SatisfactoryTools\Api\Model\Entities\ModVersion;
 use JsonException;
 use RuntimeException;
 
@@ -24,13 +25,13 @@ class CustomVersionDataGenerator
 	}
 
 	/**
-	 * @param string[] $modDataPaths
+	 * @param ModVersion[] $modVersions in merge order, each with data
 	 * @param array<string, mixed>|null $worldData
 	 */
 	public function generate(
 		string $baseRelativePath,
 		string $targetRelativePath,
-		array $modDataPaths,
+		array $modVersions,
 		float $recipeCostMultiplier,
 		float $powerCostMultiplier,
 		?array $worldData = null,
@@ -38,8 +39,25 @@ class CustomVersionDataGenerator
 	{
 		$data = $this->readJson($baseRelativePath);
 
-		foreach ($modDataPaths as $modDataPath) {
-			$this->mergeMod($data, $this->readJson($modDataPath));
+		$mods = [];
+		foreach ($modVersions as $modVersion) {
+			if ($modVersion->dataPath === null) {
+				continue;
+			}
+			$this->mergeMod($data, $this->readJson($modVersion->dataPath), $modVersion->mod->uuid->toString());
+			$mods[] = [
+				'id' => $modVersion->mod->uuid->toString(),
+				'name' => $modVersion->mod->name,
+				'reference' => $modVersion->mod->reference,
+				'versionId' => $modVersion->uuid->toString(),
+				'version' => $modVersion->name,
+			];
+		}
+		if ($mods !== []) {
+			if (!is_array($data['metadata'] ?? null)) {
+				$data['metadata'] = [];
+			}
+			$data['metadata']['mods'] = $mods;
 		}
 
 		if ($recipeCostMultiplier !== 1.0) {
@@ -83,17 +101,36 @@ class CustomVersionDataGenerator
 	}
 
 	/**
+	 * Entries the mod adds get its id in "mod"; an entry it replaces keeps the id of the mod that added it.
 	 * @param array<string, mixed> $base
 	 * @param array<string, mixed> $mod
 	 */
-	private function mergeMod(array &$base, array $mod): void
+	private function mergeMod(array &$base, array $mod, string $modId): void
 	{
 		if (isset($mod['data']) && is_array($mod['data'])) {
 			foreach ($mod['data'] as $category => $entries) {
 				if (!is_array($entries)) {
 					continue;
 				}
-				$base['data'][$category] = array_replace($base['data'][$category] ?? [], $entries);
+				$existing = is_array($base['data'][$category] ?? null) ? $base['data'][$category] : [];
+
+				// List categories (resources, materials) were replaced by index, so a mod's entries overwrote the base ones.
+				if (array_is_list($existing) && ($existing !== [] || array_is_list($entries))) {
+					$base['data'][$category] = $this->mergeList($existing, $entries, $modId);
+					continue;
+				}
+
+				foreach ($entries as $className => $entry) {
+					if (is_array($entry)) {
+						$previous = $existing[$className] ?? null;
+						$entry['mod'] = is_array($previous) ? ($previous['mod'] ?? null) : $modId;
+						if ($entry['mod'] === null) {
+							unset($entry['mod']);
+						}
+					}
+					$existing[$className] = $entry;
+				}
+				$base['data'][$category] = $existing;
 			}
 		}
 
@@ -103,6 +140,43 @@ class CustomVersionDataGenerator
 				$mod['metadata'],
 			);
 		}
+	}
+
+	/**
+	 * Objects with a className replace the entry of the same name; other values are added once.
+	 * @param list<mixed> $existing
+	 * @param array<array-key, mixed> $entries
+	 * @return list<mixed>
+	 */
+	private function mergeList(array $existing, array $entries, string $modId): array
+	{
+		$byClassName = [];
+		foreach ($existing as $index => $entry) {
+			if (is_array($entry) && isset($entry['className'])) {
+				$byClassName[(string) $entry['className']] = $index;
+			}
+		}
+
+		foreach ($entries as $entry) {
+			if (is_array($entry) && isset($entry['className'])) {
+				$index = $byClassName[(string) $entry['className']] ?? null;
+				if ($index === null) {
+					$entry['mod'] = $modId;
+					$byClassName[(string) $entry['className']] = count($existing);
+					$existing[] = $entry;
+				} else {
+					$previous = $existing[$index];
+					if (is_array($previous) && isset($previous['mod'])) {
+						$entry['mod'] = $previous['mod'];
+					}
+					$existing[$index] = $entry;
+				}
+			} elseif (!in_array($entry, $existing, true)) {
+				$existing[] = $entry;
+			}
+		}
+
+		return $existing;
 	}
 
 	/**

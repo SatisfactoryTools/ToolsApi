@@ -440,6 +440,25 @@ Overriding the decision (re-running for the same build is safe):
 `--summary-file` writes the per-variant decision as JSON; the extractor uses it for its
 notifications.
 
+Importing mods
+--------------
+
+The assets extractor's `mod:import` reads a mod from ficsit.app or a `.smod` file and stores it
+with:
+
+```sh
+php bin/console mods:import --data mod.json --reference Easy_Recipes --name "Easy Recipes" \
+    --mod-version 1.4.4 [--source-version <ficsit.app version id>] [--depends-on <mod version id>]... \
+    [--public] [--owner <account id>] [--summary-file summary.json]
+```
+
+The mod belongs to `modImportOwnerUuid` (config/local.neon) unless `--owner` is given. A mod of the
+owner with the same reference gets the version; a version with the same name has its data replaced.
+`--public` also makes the mods it needs public. A mod version's dependencies must be part of every
+custom version that uses it (`POST /v1/versions` answers 400 otherwise) and are merged before it;
+versions others depend on cannot be deleted. Entries a mod adds carry the mod's id in `mod` in the
+generated custom version files, and `metadata.mods` lists the merged mods.
+
 License
 -------
 

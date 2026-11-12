@@ -26,6 +26,7 @@ services:
 	)
 
 	- greeny\SatisfactoryTools\Api\Model\Services\ModDataStorage(%appDir%/../www)
+	- greeny\SatisfactoryTools\Api\Model\Services\ModDependencyOrder
 
 	- greeny\SatisfactoryTools\Api\Model\Services\HelpImageStorage(%appDir%/../www)
 
@@ -97,6 +98,8 @@ services:
 	- greeny\SatisfactoryTools\Api\Console\SupportersGrantCommand
 
 	- greeny\SatisfactoryTools\Api\Console\SupportersRevokeCommand
+
+	- greeny\SatisfactoryTools\Api\Console\ModsImportCommand(ownerUuid: %modImport.ownerUuid%)
 
 	- greeny\SatisfactoryTools\Api\Model\Services\Supporters\SupporterHttpClient
 

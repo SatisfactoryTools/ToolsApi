@@ -14,6 +14,7 @@ class ModResponse
 		public readonly string $id,
 		public readonly string $name,
 		public readonly bool $public,
+		public readonly ?string $reference,
 		public readonly bool $owned,
 		public readonly string $createdAt,
 		public readonly array $versions,
@@ -27,6 +28,7 @@ class ModResponse
 			id: $mod->uuid->toString(),
 			name: $mod->name,
 			public: $mod->public,
+			reference: $mod->reference,
 			owned: $viewer !== null && $mod->user->id === $viewer->id,
 			createdAt: $mod->createdAt->format('c'),
 			versions: array_map(

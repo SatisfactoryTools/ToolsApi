@@ -13,6 +13,9 @@ class ModVersionResponse
 		public readonly string $name,
 		public readonly bool $hasData,
 		public readonly string $createdAt,
+		public readonly ?string $sourceVersionId,
+		/** @var string[] */
+		public readonly array $dependencies,
 	)
 	{
 	}
@@ -25,6 +28,11 @@ class ModVersionResponse
 			name: $modVersion->name,
 			hasData: $modVersion->dataPath !== null,
 			createdAt: $modVersion->createdAt->format('c'),
+			sourceVersionId: $modVersion->sourceVersionId,
+			dependencies: array_values(array_map(
+				static fn (ModVersion $dependency): string => $dependency->uuid->toString(),
+				$modVersion->dependencies->toArray(),
+			)),
 		);
 	}
 
