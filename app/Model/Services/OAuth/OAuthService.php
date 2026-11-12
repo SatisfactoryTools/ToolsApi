@@ -24,6 +24,10 @@ class OAuthService
 	private const string CONFIRM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 	private const int CONFIRM_ATTEMPTS = 5;
 
+	/** Longer than a provider request can take (AbstractOAuthProvider's 15 s timeout). */
+	private const int PREFETCH_WAIT_SECONDS = 20;
+	private const int PREFETCH_POLL_MICROSECONDS = 250_000;
+
 	public function __construct(
 		private readonly OAuthProviderRegistry $registry,
 		private readonly OAuthStateRepository $stateRepository,
@@ -122,13 +126,13 @@ class OAuthService
 				throw new OAuthException('Please sign in to the account you are connecting ' . ucfirst($providerKey) . ' to, then try again.');
 			}
 
-			return $this->exchange($provider, $providerKey, $params, $linkUser);
+			return $this->exchange($provider, $providerKey, $params, $linkUser, $state);
 		}
 
 		$this->confirmDesktop($state, $confirmCode);
 
 		try {
-			return $this->exchange($provider, $providerKey, $params, $linkUser)->forDesktop($state);
+			return $this->exchange($provider, $providerKey, $params, $linkUser, $state)->forDesktop($state);
 		} catch (AuthException $e) {
 			$this->completeDesktop($state, ['error' => $e->getMessage()]);
 			throw $e;
@@ -149,6 +153,76 @@ class OAuthService
 			'ageSeconds' => $state !== null ? $now->getTimestamp() - $state->createdAt->getTimestamp() : null,
 			'sinceCompletedSeconds' => $state?->completedAt !== null ? $now->getTimestamp() - $state->completedAt->getTimestamp() : null,
 		]);
+	}
+
+	/**
+	 * Called by the website's index.php the moment the provider redirects back, before the app has loaded. The code is
+	 * single-use and short-lived (Discord's expires within minutes), and on a slow connection the app can take longer
+	 * than that to start and send it. Nothing is returned: the identity waits on the state for handleCallback(), which
+	 * still runs every check, and only a callback with the same parameters can use it.
+	 * @param array<string, mixed> $params
+	 */
+	public function prefetch(string $providerKey, array $params): void
+	{
+		$stateValue = is_string($params['state'] ?? null) ? $params['state'] : '';
+		$state = $stateValue !== '' ? $this->stateRepository->getByState($stateValue) : null;
+		if ($state === null || $state->provider !== $providerKey || $state->expiresAt < new DateTimeImmutable()) {
+			return;
+		}
+		if (!$this->stateRepository->claimPrefetch($state)) {
+			return;
+		}
+
+		$info = null;
+		try {
+			$info = $this->registry->get($providerKey)->fetchUserInfo($params, $this->redirectUriFor($providerKey));
+		} catch (AuthException) {
+			// Already logged by the provider; the callback reports the failure to the user.
+		} finally {
+			$state->prefetch = ['paramsHash' => $this->paramsHash($params), 'user' => $info?->toArray()];
+			$this->stateRepository->save($state);
+		}
+	}
+
+	/** @param array<string, mixed> $params */
+	private function fetchUserInfo(OAuthProviderInterface $provider, string $providerKey, array $params, OAuthState $state): OAuthUserInfo
+	{
+		$this->waitForPrefetch($state);
+
+		$prefetch = $state->prefetch;
+		if ($prefetch !== null && hash_equals($prefetch['paramsHash'], $this->paramsHash($params))) {
+			$info = is_array($prefetch['user']) ? OAuthUserInfo::fromArray($prefetch['user']) : null;
+			if ($info !== null) {
+				return $info;
+			}
+		} elseif ($prefetch !== null) {
+			$this->logger->warning('OAuth prefetch parameters differ from the callback', ['provider' => $providerKey]);
+		}
+
+		// No usable prefetch (index.php absent, or it failed): the code may still be valid, so redeem it here.
+		return $provider->fetchUserInfo($params, $this->redirectUriFor($providerKey));
+	}
+
+	/** A prefetch still talking to the provider holds the code; redeeming it here too would make one of the two fail. */
+	private function waitForPrefetch(OAuthState $state): void
+	{
+		if ($state->prefetchStartedAt === null) {
+			return;
+		}
+		$deadline = $state->prefetchStartedAt->getTimestamp() + self::PREFETCH_WAIT_SECONDS;
+		while ($state->prefetch === null && time() < $deadline) {
+			usleep(self::PREFETCH_POLL_MICROSECONDS);
+			$this->stateRepository->reload($state);
+		}
+	}
+
+	/** @param array<string, mixed> $params */
+	private function paramsHash(array $params): string
+	{
+		$strings = array_filter($params, 'is_string');
+		ksort($strings);
+
+		return hash('sha256', (string) json_encode($strings));
 	}
 
 	/** @throws OAuthConfirmationRequired */
@@ -261,9 +335,9 @@ class OAuthService
 	}
 
 	/** @param array<string, mixed> $params */
-	private function exchange(OAuthProviderInterface $provider, string $providerKey, array $params, ?User $linkUser): OAuthCallbackResult
+	private function exchange(OAuthProviderInterface $provider, string $providerKey, array $params, ?User $linkUser, OAuthState $state): OAuthCallbackResult
 	{
-		$info = $provider->fetchUserInfo($params, $this->redirectUriFor($providerKey));
+		$info = $this->fetchUserInfo($provider, $providerKey, $params, $state);
 
 		$result = $linkUser !== null
 			? $this->link($linkUser, $providerKey, $info)

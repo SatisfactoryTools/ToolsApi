@@ -39,6 +39,13 @@ class OAuthState
 	#[ORM\Column(nullable: true)]
 	public ?DateTimeImmutable $completedAt = null;
 
+	#[ORM\Column(nullable: true)]
+	public ?DateTimeImmutable $prefetchStartedAt = null;
+
+	/** @var array{paramsHash: string, user: array<string, string|null>|null}|null */
+	#[ORM\Column(type: 'json', nullable: true)]
+	public ?array $prefetch = null;
+
 	#[ORM\Column]
 	public DateTimeImmutable $expiresAt;
 

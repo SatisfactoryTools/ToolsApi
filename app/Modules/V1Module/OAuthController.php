@@ -111,6 +111,23 @@ class OAuthController extends BaseV1Controller
 		return $response->writeJsonBody($body);
 	}
 
+	/** Answers the same whatever happened, so it reveals nothing about a state or an account. */
+	#[Path('/{provider}/prefetch')]
+	#[Method('POST')]
+	#[RequestParameter(name: 'provider', type: 'string', in: EndpointParameter::IN_PATH)]
+	public function prefetch(ApiRequest $request, ApiResponse $response): ApiResponse
+	{
+		$provider = (string) $request->getParameter('provider');
+		if (!$this->oauthService->hasProvider($provider)) {
+			return $this->notFound($response);
+		}
+
+		$body = $this->parseBody($request);
+		$this->oauthService->prefetch($provider, isset($body['params']) && is_array($body['params']) ? $body['params'] : []);
+
+		return $response->withStatus(IResponse::S204_NoContent);
+	}
+
 	#[Path('/desktop/poll')]
 	#[Method('POST')]
 	public function desktopPoll(ApiRequest $request, ApiResponse $response): ApiResponse

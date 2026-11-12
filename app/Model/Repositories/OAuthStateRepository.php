@@ -24,6 +24,29 @@ class OAuthStateRepository extends BaseRepository
 			->execute();
 	}
 
+	/** One conditional UPDATE, so of two concurrent requests only one redeems the provider's single-use code. */
+	public function claimPrefetch(OAuthState $state): bool
+	{
+		$claimed = $this->entityManager->createQueryBuilder()
+			->update(OAuthState::class, 's')
+			->set('s.prefetchStartedAt', ':now')
+			->where('s.id = :id')
+			->andWhere('s.prefetchStartedAt IS NULL')
+			->andWhere('s.completedAt IS NULL')
+			->setParameter('now', new DateTimeImmutable())
+			->setParameter('id', $state->id)
+			->getQuery()
+			->execute();
+		$this->entityManager->refresh($state);
+
+		return $claimed === 1;
+	}
+
+	public function reload(OAuthState $state): void
+	{
+		$this->entityManager->refresh($state);
+	}
+
 	protected function getEntityClass(): string
 	{
 		return OAuthState::class;
