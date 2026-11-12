@@ -19,7 +19,7 @@ class OAuthStateRepository extends BaseRepository
 		$this->entityManager->createQueryBuilder()
 			->delete(OAuthState::class, 's')
 			->where('s.expiresAt < :now')
-			->setParameter('now', new DateTimeImmutable())
+			->setParameter('now', new DateTimeImmutable('-1 day'))
 			->getQuery()
 			->execute();
 	}

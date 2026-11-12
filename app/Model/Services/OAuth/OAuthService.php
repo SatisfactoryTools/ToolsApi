@@ -13,6 +13,7 @@ use greeny\SatisfactoryTools\Api\Model\Services\AuthException;
 use greeny\SatisfactoryTools\Api\Model\Services\AuthService;
 use greeny\SatisfactoryTools\Api\Model\Services\Supporters\SupporterService;
 use Nette\Utils\Random;
+use Psr\Log\LoggerInterface;
 use Throwable;
 
 class OAuthService
@@ -30,6 +31,7 @@ class OAuthService
 		private readonly UserRepository $userRepository,
 		private readonly AuthService $authService,
 		private readonly SupporterService $supporterService,
+		private readonly LoggerInterface $logger,
 		private readonly string $callbackBaseUrl,
 		private readonly int $stateTtl,
 	)
@@ -93,22 +95,25 @@ class OAuthService
 		}
 
 		$state = $this->stateRepository->getByState($stateValue);
-		if ($state !== null && $state->completedAt !== null) {
-			// A finished desktop flow: refuse a second callback, but keep the stored result for the poll.
-			throw new OAuthException('Invalid or expired OAuth state');
+		if ($state === null || $state->provider !== $providerKey) {
+			$this->logRejectedState('unknown', $providerKey, $state);
+			throw new OAuthException('This sign-in link is not valid. Please start signing in again.');
 		}
-		if ($state === null || $state->provider !== $providerKey || $state->expiresAt < new DateTimeImmutable()) {
-			if ($state !== null) {
-				$this->stateRepository->delete($state);
-			}
-			throw new OAuthException('Invalid or expired OAuth state');
+		if ($state->completedAt !== null) {
+			$this->logRejectedState('used', $providerKey, $state);
+			throw new OAuthException('This sign-in link has already been used. If you are not signed in, please start signing in again.');
+		}
+		if ($state->expiresAt < new DateTimeImmutable()) {
+			$this->logRejectedState('expired', $providerKey, $state);
+			throw new OAuthException('Signing in took too long and the link has expired. Please start signing in again.');
 		}
 
 		$linkUser = $state->linkUser;
 
 		if ($state->pollToken === null) {
 			// State is single-use: consume it before doing anything else.
-			$this->stateRepository->delete($state);
+			$state->completedAt = new DateTimeImmutable();
+			$this->stateRepository->save($state);
 
 			if (!$startedHere) {
 				throw new OAuthException('This sign-in was started in another browser. Please start it again here.');
@@ -132,6 +137,18 @@ class OAuthService
 			$this->completeDesktop($state, ['error' => 'Signing in did not work. Please try again.']);
 			throw $e;
 		}
+	}
+
+	private function logRejectedState(string $reason, string $providerKey, ?OAuthState $state): void
+	{
+		$now = new DateTimeImmutable();
+		$this->logger->warning('OAuth callback rejected: ' . $reason, [
+			'provider' => $providerKey,
+			'stateProvider' => $state?->provider,
+			'desktop' => $state !== null && $state->pollToken !== null,
+			'ageSeconds' => $state !== null ? $now->getTimestamp() - $state->createdAt->getTimestamp() : null,
+			'sinceCompletedSeconds' => $state?->completedAt !== null ? $now->getTimestamp() - $state->completedAt->getTimestamp() : null,
+		]);
 	}
 
 	/** @throws OAuthConfirmationRequired */

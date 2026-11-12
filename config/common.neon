@@ -102,7 +102,7 @@ parameters:
 
 	oauth:
 		callbackBaseUrl: %oauthCallbackBaseUrl%
-		stateTtl: 600             # 10 minutes
+		stateTtl: 1800 # 30 minutes
 		discord:
 			clientId: %oauthDiscordClientId%
 			clientSecret: %oauthDiscordClientSecret%
