@@ -100,7 +100,7 @@ abstract class AbstractOAuthProvider implements OAuthProviderInterface
 		}
 
 		if ($status >= 400) {
-			$this->logger?->warning(sprintf('Provider %s answered HTTP %d for %s', $this->getKey(), $status, strtok($url, '?')));
+			$this->logger?->warning(sprintf('Provider %s answered HTTP %d for %s: %s', $this->getKey(), $status, strtok($url, '?'), mb_substr($response, 0, 500)));
 			throw new OAuthException(ucfirst($this->getKey()) . ' refused the sign-in. Please try again.');
 		}
 
