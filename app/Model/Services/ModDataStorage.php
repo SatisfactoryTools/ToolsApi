@@ -5,9 +5,13 @@ namespace greeny\SatisfactoryTools\Api\Model\Services;
 use JsonException;
 use Ramsey\Uuid\UuidInterface;
 use RuntimeException;
+use stdClass;
 
 class ModDataStorage
 {
+
+	/** Keyed by className; materials and resources are lists. */
+	private const array KEYED_COLLECTIONS = ['items', 'recipes', 'buildings', 'schematics'];
 
 	public function __construct(
 		private readonly string $wwwDir,
@@ -27,7 +31,7 @@ class ModDataStorage
 		}
 
 		try {
-			$json = json_encode($data, JSON_THROW_ON_ERROR);
+			$json = json_encode($this->restoreEmptyObjects($data), JSON_THROW_ON_ERROR);
 		} catch (JsonException $e) {
 			throw new RuntimeException('Could not encode mod data', 0, $e);
 		}
@@ -49,6 +53,33 @@ class ModDataStorage
 		if (is_file($absolute)) {
 			@unlink($absolute); // @ intentional
 		}
+	}
+
+	/**
+	 * The body is decoded into PHP arrays, so an empty JSON object would be written back as [].
+	 * @param array<string, mixed> $file
+	 * @return array<string, mixed>
+	 */
+	private function restoreEmptyObjects(array $file): array
+	{
+		$wrapped = array_key_exists('data', $file) && is_array($file['data']);
+		$data = $wrapped ? $file['data'] : $file;
+
+		foreach (self::KEYED_COLLECTIONS as $collection) {
+			if (($data[$collection] ?? null) === []) {
+				$data[$collection] = new stdClass();
+			}
+		}
+
+		if (!$wrapped) {
+			return $data;
+		}
+		$file['data'] = $data === [] ? new stdClass() : $data;
+		if (($file['metadata'] ?? null) === []) {
+			$file['metadata'] = new stdClass();
+		}
+
+		return $file;
 	}
 
 	private function absolutePath(string $relativePath): string

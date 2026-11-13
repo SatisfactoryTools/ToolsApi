@@ -27,6 +27,9 @@ services:
 
 	- greeny\SatisfactoryTools\Api\Model\Services\ModDataStorage(%appDir%/../www)
 	- greeny\SatisfactoryTools\Api\Model\Services\ModDependencyOrder
+	- greeny\SatisfactoryTools\Api\Model\Services\ModCatalog(wwwDir: %appDir%/../www)
+	- greeny\SatisfactoryTools\Api\Model\Services\ModSuggestionService
+	- greeny\SatisfactoryTools\Api\Model\Services\Ficsit\FicsitAppClient
 
 	- greeny\SatisfactoryTools\Api\Model\Services\HelpImageStorage(%appDir%/../www)
 
@@ -100,6 +103,7 @@ services:
 	- greeny\SatisfactoryTools\Api\Console\SupportersRevokeCommand
 
 	- greeny\SatisfactoryTools\Api\Console\ModsImportCommand(ownerUuid: %modImport.ownerUuid%)
+	- greeny\SatisfactoryTools\Api\Console\VersionsRefreshCommand
 
 	- greeny\SatisfactoryTools\Api\Model\Services\Supporters\SupporterHttpClient
 

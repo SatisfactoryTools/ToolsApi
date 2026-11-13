@@ -116,6 +116,9 @@ jobs:
             -   name: Update database schema
                 run: ssh deploy-target "cd '$DEPLOY_PATH' && $PHP_BIN bin/console orm:schema-tool:update --dump-sql --force --no-interaction"
 
+            -   name: Regenerate custom versions with mods
+                run: ssh deploy-target "cd '$DEPLOY_PATH' && $PHP_BIN bin/console versions:refresh --no-interaction"
+
             # Drops whatever the console run warmed up, so the first request rebuilds against the
             # schema it just applied.
             -   name: Clear cache again

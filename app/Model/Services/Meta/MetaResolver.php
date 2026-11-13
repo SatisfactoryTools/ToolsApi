@@ -17,7 +17,7 @@ class MetaResolver
 
 	/** Keep in sync with RouteList.ts. */
 	private const array RESERVED_SEGMENTS = [
-		'settings', 'about', 'create-version', 'mods', 'mod-editor', 'help', 'auth', 'account', 'shared',
+		'settings', 'about', 'create-version', 'supported-mods', 'mods', 'mod-editor', 'help', 'auth', 'account', 'shared',
 		'0.8', '1.0', '1.0-ficsmas', 'production', 'codex', 'import',
 	];
 
@@ -30,6 +30,7 @@ class MetaResolver
 	private const array FIXED_PAGES = [
 		'about' => ['About', 'Who makes Satisfactory Tools, what it can do, and where to report a bug or ask for a feature.', true],
 		'create-version' => ['Create custom version', 'Make your own game version: add mods, change recipe and power costs, and set up a different world.', true],
+		'supported-mods' => ['Supported mods', 'Satisfactory mods you can add to a custom game version and plan with. Suggest the mod you want next.', true],
 		'mods' => ['Mods', 'Upload and manage mod data, then use the mods in your custom game versions.', false],
 		'mod-editor' => ['Mod editor', 'Write the items, recipes and buildings of a mod and get the data file to upload.', true],
 		'help' => ['Help', 'Guides and reference for Satisfactory Tools.', true],
@@ -287,6 +288,7 @@ class MetaResolver
 			$links[] = new PageLink(CanonicalVersion::path($version, ['codex']), 'Codex');
 			$links[] = new PageLink(CanonicalVersion::path($version, ['map']), 'Map');
 		}
+		$links[] = new PageLink('/supported-mods', 'Supported mods');
 		$links[] = new PageLink('/help', 'Help');
 		$links[] = new PageLink('/about', 'About');
 

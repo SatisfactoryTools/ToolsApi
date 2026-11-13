@@ -46,6 +46,7 @@ parameters:
 		clientError: {limit: 60, window: 3600}
 		legacySolver: {limit: 60, window: 600}
 		legacyShareFetch: {limit: 30, window: 600}  # fetches from the old API only, stored shares are free
+		modSuggestion: {limit: 20, window: 3600}    # "suggest a mod" form, also caps ficsit.app lookups
 
 	# Limits applied by RateLimitMiddleware before routing; the rest are checked in code where only some
 	# requests count (see rateLimits comments).

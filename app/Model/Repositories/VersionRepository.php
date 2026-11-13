@@ -3,6 +3,7 @@
 namespace greeny\SatisfactoryTools\Api\Model\Repositories;
 
 use DateTimeImmutable;
+use greeny\SatisfactoryTools\Api\Model\Entities\ModVersion;
 use greeny\SatisfactoryTools\Api\Model\Entities\User;
 use greeny\SatisfactoryTools\Api\Model\Entities\Version;
 use Ramsey\Uuid\Uuid;
@@ -30,6 +31,27 @@ class VersionRepository extends BaseRepository
 			->where('v.custom = false')
 			->orWhere(':user MEMBER OF v.users')
 			->setParameter('user', $user)
+			->getQuery()
+			->getResult();
+	}
+
+	/** @return Version[] */
+	public function getCustomWithMods(): array
+	{
+		return $this->getRepository()->createQueryBuilder('v')
+			->where('v.custom = true')
+			->andWhere('SIZE(v.modVersions) > 0')
+			->getQuery()
+			->getResult();
+	}
+
+	/** @return Version[] */
+	public function getUsingModVersion(ModVersion $modVersion): array
+	{
+		return $this->getRepository()->createQueryBuilder('v')
+			->innerJoin('v.modVersions', 'link')
+			->where('link.modVersion = :modVersion')
+			->setParameter('modVersion', $modVersion)
 			->getQuery()
 			->getResult();
 	}

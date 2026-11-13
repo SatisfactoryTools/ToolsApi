@@ -6,7 +6,7 @@ namespace greeny\SatisfactoryTools\Api\Model\Services\Meta;
 class SitemapBuilder
 {
 
-	private const array FIXED_PATHS = ['/', '/about', '/create-version', '/mod-editor', '/help'];
+	private const array FIXED_PATHS = ['/', '/about', '/create-version', '/supported-mods', '/mod-editor', '/help'];
 
 	private const array CODEX_SECTIONS = ['items', 'recipes', 'buildings', 'schematics'];
 

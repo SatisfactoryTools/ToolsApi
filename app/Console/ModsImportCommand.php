@@ -8,6 +8,8 @@ use greeny\SatisfactoryTools\Api\Model\Entities\ModVersion;
 use greeny\SatisfactoryTools\Api\Model\Repositories\ModRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\ModVersionRepository;
 use greeny\SatisfactoryTools\Api\Model\Repositories\UserRepository;
+use greeny\SatisfactoryTools\Api\Model\Repositories\VersionRepository;
+use greeny\SatisfactoryTools\Api\Model\Services\CustomVersionFileService;
 use greeny\SatisfactoryTools\Api\Model\Services\ModDataStorage;
 use JsonException;
 use Ramsey\Uuid\Uuid;
@@ -27,6 +29,8 @@ class ModsImportCommand extends Command
 		private readonly ModVersionRepository $modVersionRepository,
 		private readonly ModDataStorage $modDataStorage,
 		private readonly UserRepository $userRepository,
+		private readonly VersionRepository $versionRepository,
+		private readonly CustomVersionFileService $fileService,
 		private readonly string $ownerUuid,
 	)
 	{
@@ -129,6 +133,15 @@ class ModsImportCommand extends Command
 		$modVersion->dataPath = $this->modDataStorage->store($modVersion->uuid, $data);
 		$this->modVersionRepository->save($modVersion);
 
+		// Their files would otherwise keep the replaced data until pruned.
+		$refreshed = 0;
+		foreach ($createdVersion ? [] : $this->versionRepository->getUsingModVersion($modVersion) as $version) {
+			if ($this->fileService->ensureFile($version)) {
+				$this->versionRepository->save($version);
+				$refreshed++;
+			}
+		}
+
 		$summary = [
 			'modId' => $mod->uuid->toString(),
 			'modVersionId' => $modVersion->uuid->toString(),
@@ -140,8 +153,9 @@ class ModsImportCommand extends Command
 			file_put_contents((string) $summaryFile, json_encode($summary, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
 		}
 
-		$io->success(sprintf('%s %s %s (%s, version %s).', $mod->name, $versionName,
-			$createdVersion ? 'imported' : 'replaced', $mod->public ? 'public' : 'private', $modVersion->uuid->toString()));
+		$io->success(sprintf('%s %s %s (%s, version %s).%s', $mod->name, $versionName,
+			$createdVersion ? 'imported' : 'replaced', $mod->public ? 'public' : 'private', $modVersion->uuid->toString(),
+			$refreshed > 0 ? sprintf(' Regenerated %d custom version(s) using it.', $refreshed) : ''));
 
 		return Command::SUCCESS;
 	}
